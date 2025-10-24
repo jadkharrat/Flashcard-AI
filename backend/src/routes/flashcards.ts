@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { extractTextFromPDF } from "../services/pdfParser.js";
+import { generateFlashcardsFromText } from "../services/openaiService.js";
 
 const router = Router();
 const upload = multer({storage: multer.memoryStorage()});
@@ -17,7 +18,8 @@ router.post("/generate", upload.single("file"), async (req, res) => {
         if (!text || text.length < 200) {
             return res.status(422).json({ error: "No extractable text found (PDF may be scanned)." });
         }
-        res.json({ text });
+        const flashcards = await generateFlashcardsFromText(text);
+        return res.json({ flashcards });
     } catch (error) {
         console.error("Error generating flashcards:", error);
         return res.status(500).json({ error: String(error) });
