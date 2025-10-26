@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
-import { extractTextFromPDF } from "../services/pdfParser.js";
-import { generateFlashcardsFromText } from "../services/openaiService.js";
+import { extractTextFromPDF } from "../services/pdfParser.ts";
+import { generateFlashcardsFromText } from "../services/openaiService.ts";
 
 const router = Router();
 const upload = multer({storage: multer.memoryStorage()});

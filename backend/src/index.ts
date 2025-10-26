@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import FlashcardRoutes from "./routes/flashcards.js";
+import FlashcardRoutes from "./routes/flashcards.ts";
 
 
 dotenv.config();
