@@ -37,7 +37,7 @@ function Home() {
             </div>
 
             {flashcards.length > 0 && (
-                <div className="max-w-5xl mx-auto mt-10 grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="max-w-6xl mx-auto mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {flashcards.map((card, i) => (
                     <Flashcard key={i} card={card} index={i} />
                 ))}
