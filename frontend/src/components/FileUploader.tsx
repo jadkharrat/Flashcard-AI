@@ -25,12 +25,17 @@ function FileUploader({ onUpload, loading }: props) {
                 type="file"
                 accept="application/pdf"
                 onChange={handleChange}
-                className="text-sm border rounded-lg p-2 w-full cursor-pointer"
+                className="text-sm border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg p-2 w-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
             />
             <button
                 onClick={handleSubmit}
                 disabled={!file || loading}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg transition w-full"
+                className={`w-full px-4 py-2 rounded-lg font-medium shadow transition
+                ${
+                  !file || loading
+                    ? "bg-gray-400 dark:bg-gray-700 text-gray-200 cursor-not-allowed"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100"
+                }`}
             >
                 {loading ? "Generating..." : "Upload & Generate"}
             </button>
