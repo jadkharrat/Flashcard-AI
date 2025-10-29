@@ -33,9 +33,14 @@ build/
 .idea/
 
 # Backend
-backend/node_modules/
-backend/dist/
-backend/.env
+/backend/data/*.sqlite
+/backend/data/*.sqlite-journal
+/backend/.env
+/backend/node_modules/
+/backend/dist/
+/backend/prisma/.prisma/
+/backend/prisma/migrations/
+/backend/prisma.config.ts
 
 # Frontend
 frontend/node_modules/
