@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import FlashcardRoutes from "./routes/flashcards.ts";
 import "./database/connection.ts";
+import authRoutes from "./routes/auth.ts";
 
 
 dotenv.config();
@@ -12,9 +13,7 @@ const port = process.env.port || 5050;
 app.use(cors());
 app.use(express.json());
 
-app.get("/health", (req, res) => {
-  res.send("Flashcard AI Backend is running");
-});
+app.use("/api/auth", authRoutes);
 
 app.use("/api/flashcards", FlashcardRoutes);
 
