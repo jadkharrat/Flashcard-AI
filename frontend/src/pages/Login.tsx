@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api/authApi";
+import AuthLayout from "../components/AuthLayout";
 
 function Login() {
     const [username, setUsername] = useState<string>("");
@@ -29,49 +30,68 @@ function Login() {
         }
     }
 
+    const handleDemo = () => {
+        sessionStorage.setItem("demoMode", "true");
+        navigate("/home");
+    }
+
     useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) navigate("/home");
+    const demoMode = sessionStorage.getItem("demoMode");
+    if (token || demoMode) navigate("/home");
     }, [navigate]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 transition-colors duration-500">
-            <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-            <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">Login</h2>
+        <AuthLayout>
+            <div className="auth-card">
+                <div className="auth-card__heading">
+                    <p className="eyebrow">Welcome back</p>
+                    <h2>Continue your study session</h2>
+                    <p>Sign in to generate a new deck from your course material.</p>
+                </div>
 
-            <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            />
-            <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            />
+                <form onSubmit={handleSubmit} className="auth-form">
+                    <label htmlFor="username">Username</label>
+                    <input
+                        id="username"
+                        type="text"
+                        autoComplete="username"
+                        placeholder="Enter your username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                    />
 
-            {errorMessage && <p className="text-red-500 text-center mb-3">{errorMessage}</p>}
+                    <label htmlFor="password">Password</label>
+                    <input
+                        id="password"
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                    />
 
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 font-bold py-2 px-4 rounded-lg shadow transition"
-            >
-                {loading ? "Logging in..." : "Login"}
-            </button>
+                    {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
 
-            <p className="w-full text-center mt-4 text-gray-700 dark:text-gray-300">
-                Don't have an account?{" "}
-                <Link to="/register" className="text-indigo-600 hover:underline font-medium">
-                    Register
-                </Link>
-            </p>
-            </form>
-        </div>
+                    <button type="submit" disabled={loading} className="button button--primary button--full">
+                        {loading ? <><span className="button-spinner" /> Signing in…</> : "Sign in"}
+                    </button>
+                </form>
+
+                <div className="auth-divider"><span>or explore first</span></div>
+
+                <button type="button" className="button button--secondary button--full" onClick={handleDemo}>
+                    Preview a sample deck
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+
+                <p className="auth-switch">
+                    New to RecallAI? <Link to="/register">Create an account</Link>
+                </p>
+            </div>
+        </AuthLayout>
     )
 }
 

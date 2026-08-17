@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api/authApi";
+import AuthLayout from "../components/AuthLayout";
 
 function Register() {
     const [username, setUsername] = useState<string>("");
@@ -33,61 +34,49 @@ function Register() {
 
     useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token) navigate("/home");
+    const demoMode = sessionStorage.getItem("demoMode");
+    if (token || demoMode) navigate("/home");
     }, [navigate]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 transition-colors duration-500">
-            <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">Register</h2>
+        <AuthLayout>
+            <div className="auth-card auth-card--register">
+                <div className="auth-card__heading">
+                    <p className="eyebrow">Create your workspace</p>
+                    <h2>Start learning actively</h2>
+                    <p>Your next study deck is one PDF away.</p>
+                </div>
 
-                <input
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                <input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                <input
-                    type="text"
-                    placeholder="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
-                <input
-                    type="text"
-                    placeholder="Surname"
-                    value={surname}
-                    onChange={(e) => setSurname(e.target.value)}
-                    className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                />
+                <form onSubmit={handleSubmit} className="auth-form">
+                    <div className="form-row">
+                        <div>
+                            <label htmlFor="name">First name</label>
+                            <input id="name" type="text" autoComplete="given-name" placeholder="Jad" value={name} onChange={(e) => setName(e.target.value)} required />
+                        </div>
+                        <div>
+                            <label htmlFor="surname">Last name</label>
+                            <input id="surname" type="text" autoComplete="family-name" placeholder="Kharrat" value={surname} onChange={(e) => setSurname(e.target.value)} required />
+                        </div>
+                    </div>
 
-                {errorMessage && <p className="text-red-500 text-center mb-3">{errorMessage}</p>}
+                    <label htmlFor="username">Username</label>
+                    <input id="username" type="text" autoComplete="username" placeholder="Choose a username" value={username} onChange={(e) => setUsername(e.target.value)} required />
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 font-bold py-2 px-4 rounded-lg shadow transition"
-                >
-                    {loading ? "Registering..." : "Register"}
-                </button>
+                    <label htmlFor="password">Password</label>
+                    <input id="password" type="password" autoComplete="new-password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
 
-                <p className="w-full text-center mt-4 text-gray-700 dark:text-gray-300">
-                    Already have an account?{" "}
-                    <Link to="/login" className="text-indigo-600 hover:underline font-medium">
-                        Login
-                    </Link>
+                    {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
+
+                    <button type="submit" disabled={loading} className="button button--primary button--full">
+                        {loading ? <><span className="button-spinner" /> Creating account…</> : "Create account"}
+                    </button>
+                </form>
+
+                <p className="auth-switch">
+                    Already have an account? <Link to="/login">Sign in</Link>
                 </p>
-            </form>
-        </div>
+            </div>
+        </AuthLayout>
     )
 }
 
