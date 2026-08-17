@@ -1,43 +1,54 @@
-import React, {useState, useEffect} from "react";
+import { useState, useEffect } from "react";
 import type { Flashcard as FlashcardType } from "../api/flashcardApi";
 
-interface props {
+interface FlashcardProps {
     card: FlashcardType;
     index: number;
     flippedAll?: boolean;
 }
 
-function Flashcard({ card, index, flippedAll = false }: props) {
+function Flashcard({ card, index, flippedAll = false }: FlashcardProps) {
     const [flipped, setFlipped] = useState<boolean>(false);
 
     useEffect(() => {
-        setFlipped(flippedAll)
+        setFlipped(flippedAll);
     }, [flippedAll]);
 
     return (
-        <div
+        <button
+            type="button"
             onClick={() => setFlipped(!flipped)}
-            className="relative w-72 h-44 cursor-pointer perspective mx-auto"
-            >
-            <div
-                className={`relative w-full h-full text-center transition-transform duration-700 transform-style-preserve-3d ${
-                flipped ? "rotate-y-180" : ""
-                }`}
-            >
-                {/* Question Front Side */}
-                <div className="absolute inset-0 flex flex-col justify-center items-center bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 backface-hidden">
-                <p className="font-semibold text-lg mb-2">Q{index + 1}</p>
-                <p className="px-3">{card.question}</p>
-                </div>
+            className={`flashcard ${flipped ? "flashcard--flipped" : ""}`}
+            aria-label={`Card ${index + 1}: ${flipped ? "show question" : "reveal answer"}`}
+            aria-pressed={flipped}
+        >
+            <span className="flashcard__inner">
+                <span className="flashcard__face flashcard__front">
+                    <span className="flashcard__topline">
+                        <span className="flashcard__number">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="flashcard__type">Question</span>
+                    </span>
+                    <span className="flashcard__content">{card.question}</span>
+                    <span className="flashcard__hint">
+                        Reveal answer
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.3-6" /><path d="M17 2v4h-4" /></svg>
+                    </span>
+                </span>
 
-                {/* Answer Back Side */}
-                <div className="absolute inset-0 flex flex-col justify-center items-center bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transform rotate-y-180 backface-hidden">
-                <p className="font-semibold mb-2">Answer</p>
-                <p className="px-3">{card.answer}</p>
-                </div>
-            </div>
-        </div>
-    )
+                <span className="flashcard__face flashcard__back">
+                    <span className="flashcard__topline">
+                        <span className="flashcard__number">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="flashcard__type">Answer</span>
+                    </span>
+                    <span className="flashcard__content">{card.answer}</span>
+                    <span className="flashcard__hint">
+                        Back to question
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 0-13.3-6" /><path d="M7 2v4h4" /></svg>
+                    </span>
+                </span>
+            </span>
+        </button>
+    );
 }
 
 export default Flashcard;

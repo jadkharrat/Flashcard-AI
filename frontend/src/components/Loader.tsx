@@ -1,7 +1,11 @@
 function Loader() {
   return (
-    <div className="flex items-center justify-center mt-6">
-      <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="generation-status" role="status" aria-live="polite">
+      <span className="generation-status__spinner" aria-hidden="true" />
+      <span>
+        <strong>Finding the ideas worth remembering…</strong>
+        <small>Reading your PDF and writing concise questions</small>
+      </span>
     </div>
   );
 }
