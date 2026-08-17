@@ -8,16 +8,19 @@ const router = Router();
 router.post("/register", async (req, res) => {
     try {
         const { username, password, name, surname } = req.body;
+
+        if (!username || !password || !name || !surname) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({ error: "Password must be at least 8 characters" });
+        }
         
         const existingUser = await prisma.user.findUnique({ where: { username } });
         if (existingUser) {
             return res.status(409).json({ error: "Username already exists" });
         }
-
-        if(!username || !password) {
-            return res.status(400).json({ error: "Username and password are required" });
-        }
-
         const hashedPassword = await hashPassword(password);
 
         const newUser = await prisma.user.create({
@@ -52,15 +55,14 @@ router.post("/login", async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        if (!username || !password) {
+            return res.status(400).json({ error: "Username and password are required" });
+        }
+
         const user = await prisma.user.findUnique({ where: { username } });
         if (!user) {
             return res.status(401).json({ error: "Invalid username or password" });
         }
-
-        if (!username || !password) {
-            return res.status(400).json({ error: "Username and password are required" });
-        }
-        
         const isPasswordValid = await verifyPassword(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({ error: "Invalid username or password" });
