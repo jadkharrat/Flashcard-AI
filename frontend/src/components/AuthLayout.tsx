@@ -7,13 +7,20 @@ interface AuthLayoutProps {
 
 function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <main className="auth-page">
+    <main className="auth-page" id="main-content">
+      <section className="auth-panel">
+        <div className="auth-panel__mobile-brand">
+          <Brand />
+        </div>
+        {children}
+      </section>
+
       <section className="auth-story" aria-label="Product introduction">
         <Brand light />
 
         <div className="auth-story__copy">
           <p className="eyebrow eyebrow--light">AI-powered study workspace</p>
-          <h1>Turn dense PDFs into knowledge that sticks.</h1>
+          <h2>Turn dense PDFs into knowledge that sticks.</h2>
           <p>
             Upload your reading and get a focused deck of questions in seconds—ready
             for active recall, not another passive reread.
@@ -50,13 +57,6 @@ function AuthLayout({ children }: AuthLayoutProps) {
           <span>AI generation</span>
           <span>Active recall</span>
         </div>
-      </section>
-
-      <section className="auth-panel">
-        <div className="auth-panel__mobile-brand">
-          <Brand />
-        </div>
-        {children}
       </section>
     </main>
   );

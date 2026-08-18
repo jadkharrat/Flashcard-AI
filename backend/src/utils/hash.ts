@@ -1,11 +1,12 @@
 import bcrypt from "bcrypt";
 
-async function hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+const SALT_ROUNDS = 12;
+
+function hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
+function verifyPassword(password: string, hash: string): Promise<boolean> {
     return bcrypt.compare(password, hash);
 }
 

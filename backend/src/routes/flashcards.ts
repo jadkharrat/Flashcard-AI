@@ -1,28 +1,67 @@
+import { extname } from "node:path";
 import { Router } from "express";
 import multer from "multer";
-import { extractTextFromPDF } from "../services/pdfParser.ts";
-import { generateFlashcardsFromText } from "../services/openaiService.ts";
+import { AppError } from "../errors/AppError.js";
+import { requireAuthentication } from "../middleware/authenticate.js";
+import { generateFlashcardsFromText } from "../services/openaiService.js";
+import {
+    extractTextFromPDF,
+    hasPdfSignature,
+    MAX_PDF_BYTES,
+} from "../services/pdfParser.js";
 
 const router = Router();
-const upload = multer({storage: multer.memoryStorage()});
+const acceptedMimeTypes = new Set(["application/pdf", "application/x-pdf", "application/octet-stream"]);
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fieldSize: 1_024,
+        fields: 0,
+        fileSize: MAX_PDF_BYTES,
+        files: 1,
+    },
+    fileFilter: (_req, file, callback) => {
+        const hasPdfExtension = extname(file.originalname).toLowerCase() === ".pdf";
+        if (!hasPdfExtension || !acceptedMimeTypes.has(file.mimetype)) {
+            callback(new AppError(415, "Only PDF files are supported", "UNSUPPORTED_FILE_TYPE"));
+            return;
+        }
 
-router.post("/generate", upload.single("file"), async (req, res) => {
+        callback(null, true);
+    },
+});
+
+router.post("/generate", requireAuthentication, upload.single("file"), async (req, res, next) => {
     try {
         const buffer = req.file?.buffer;
         if (!buffer) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-        if (buffer.length > 10 * 1024 * 1024) return res.status(413).json({ error: "File too large (>10MB)" });
 
-        const text = await extractTextFromPDF(buffer);
-        if (!text || text.length < 200) {
-            return res.status(422).json({ error: "No extractable text found (PDF may be scanned)." });
+        if (!hasPdfSignature(buffer)) {
+            throw new AppError(415, "The uploaded file is not a valid PDF", "INVALID_PDF_SIGNATURE");
         }
-        const flashcards = await generateFlashcardsFromText(text);
-        return res.json({ flashcards });
+
+        const extracted = await extractTextFromPDF(buffer);
+        if (extracted.text.length < 100) {
+            throw new AppError(
+                422,
+                "The PDF contains too little readable text. Scanned PDFs require OCR before upload.",
+                "PDF_HAS_NO_TEXT",
+            );
+        }
+
+        const generated = await generateFlashcardsFromText(extracted.text);
+        return res.json({
+            flashcards: generated.flashcards,
+            meta: {
+                pageCount: extracted.pageCount,
+                sourceTruncated: extracted.extractionTruncated || generated.sourceTruncated,
+            },
+        });
     } catch (error) {
-        console.error("Error generating flashcards:", error);
-        return res.status(500).json({ error: String(error) });
+        next(error);
+        return;
     }
 });
 

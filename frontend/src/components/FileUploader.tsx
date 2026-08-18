@@ -19,10 +19,16 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
     const [dragActive, setDragActive] = useState(false);
     const [validationError, setValidationError] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
+    const dragDepth = useRef(0);
 
-    const selectFile = (nextFile?: File) => {
+    const selectFile = (nextFile?: File, fileCount = nextFile ? 1 : 0) => {
         setValidationError("");
         if (!nextFile) return;
+        if (fileCount > 1) {
+            setFile(null);
+            setValidationError("Choose one PDF at a time.");
+            return;
+        }
         if (nextFile.type !== "application/pdf" && !nextFile.name.toLowerCase().endsWith(".pdf")) {
             setFile(null);
             setValidationError("Please choose a PDF file.");
@@ -33,17 +39,41 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
             setValidationError("That file is larger than the 10 MB limit.");
             return;
         }
+        if (nextFile.size === 0) {
+            setFile(null);
+            setValidationError("That PDF is empty. Choose a file with readable content.");
+            return;
+        }
         setFile(nextFile);
     };
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-        selectFile(event.target.files?.[0]);
+        selectFile(event.target.files?.[0], event.target.files?.length);
+        event.target.value = "";
     };
 
     const handleDrop = (event: DragEvent<HTMLDivElement>) => {
         event.preventDefault();
+        dragDepth.current = 0;
         setDragActive(false);
-        selectFile(event.dataTransfer.files?.[0]);
+        if (!loading) selectFile(event.dataTransfer.files?.[0], event.dataTransfer.files?.length);
+    };
+
+    const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        if (loading) return;
+        dragDepth.current += 1;
+        setDragActive(true);
+    };
+
+    const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragActive(false);
+    };
+
+    const openFilePicker = () => {
+        if (!loading) inputRef.current?.click();
     };
 
     const handleSubmit = () => {
@@ -54,12 +84,14 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
         <div className="uploader">
             <div
                 className={`drop-zone ${dragActive ? "drop-zone--active" : ""} ${file ? "drop-zone--selected" : ""}`}
-                onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+                onDragEnter={handleDragEnter}
                 onDragOver={(event) => event.preventDefault()}
-                onDragLeave={() => setDragActive(false)}
+                onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
+                aria-busy={loading}
+                aria-describedby={`upload-help${validationError ? " upload-error" : ""}`}
             >
-                <input ref={inputRef} id="pdf-upload" type="file" accept="application/pdf,.pdf" onChange={handleChange} disabled={loading} />
+                <input ref={inputRef} id="pdf-upload" type="file" accept="application/pdf,.pdf" onChange={handleChange} disabled={loading} tabIndex={-1} />
                 <div className="drop-zone__icon" aria-hidden="true">
                     {file ? (
                         <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg>
@@ -70,18 +102,18 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
                 {file ? (
                     <>
                         <strong className="drop-zone__filename">{file.name}</strong>
-                        <span>{formatFileSize(file.size)} · Ready to generate</span>
-                        <button type="button" className="text-button" onClick={() => inputRef.current?.click()} disabled={loading}>Choose a different PDF</button>
+                        <span id="upload-help">{formatFileSize(file.size)} · Ready to generate</span>
+                        <button type="button" className="text-button" onClick={openFilePicker} disabled={loading}>Choose a different PDF</button>
                     </>
                 ) : (
                     <>
-                        <strong>Drop a PDF here, or <button type="button" className="inline-button" onClick={() => inputRef.current?.click()}>browse</button></strong>
-                        <span>Text-based PDFs up to 10 MB</span>
+                        <strong>Drop a PDF here, or <button type="button" className="inline-button" onClick={openFilePicker} disabled={loading}>browse</button></strong>
+                        <span id="upload-help">Text-based PDFs up to 10 MB</span>
                     </>
                 )}
             </div>
 
-            {validationError && <p className="validation-error" role="alert">{validationError}</p>}
+            {validationError && <p className="validation-error" id="upload-error" role="alert">{validationError}</p>}
 
             <button type="button" onClick={handleSubmit} disabled={!file || loading} className="button button--primary button--full">
                 {loading ? "Building your deck…" : "Generate flashcards"}

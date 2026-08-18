@@ -1,24 +1,44 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { login } from "../api/authApi";
 import AuthLayout from "../components/AuthLayout";
+import PasswordField from "../components/PasswordField";
+import { saveAuthSession, startDemoSession } from "../lib/session";
+import { validatePassword, validateUsername } from "../lib/authValidation";
 
 function Login() {
+    const location = useLocation();
+    const routeNotice = (location.state as { notice?: unknown } | null)?.notice;
     const [username, setUsername] = useState<string>("");
     const [password, setPassword] = useState<string>("");
-    const [errorMessage, setErrorMessage] = useState<string>("");
+    const [errorMessage, setErrorMessage] = useState<string>(typeof routeNotice === "string" ? routeNotice : "");
     const [loading, setLoading] = useState<boolean>(false);
     const navigate = useNavigate();
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    useEffect(() => {
+        document.title = "Sign in — RecallAI";
+    }, []);
+
+    const clearError = () => {
+        if (errorMessage) setErrorMessage("");
+    };
+
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setErrorMessage("");
+
+        const normalizedUsername = username.trim().toLowerCase();
+        const validationError = validateUsername(normalizedUsername) || validatePassword(password);
+        if (validationError) {
+            setErrorMessage(validationError);
+            return;
+        }
+
         setLoading(true);
         try {
-            const response = await login({ username, password });
-            localStorage.setItem("token", response.token);
-            localStorage.setItem("user", JSON.stringify(response.user));
-            navigate("/home");
+            const response = await login({ username: normalizedUsername, password });
+            saveAuthSession(response.token, response.user);
+            navigate("/home", { replace: true });
         } catch (error) {
             if (error instanceof Error) {
                 setErrorMessage(error.message);
@@ -31,58 +51,63 @@ function Login() {
     }
 
     const handleDemo = () => {
-        sessionStorage.setItem("demoMode", "true");
-        navigate("/home");
-    }
-
-    useEffect(() => {
-    const token = localStorage.getItem("token");
-    const demoMode = sessionStorage.getItem("demoMode");
-    if (token || demoMode) navigate("/home");
-    }, [navigate]);
+        startDemoSession();
+        navigate("/home", { replace: true });
+    };
 
     return (
         <AuthLayout>
             <div className="auth-card">
                 <div className="auth-card__heading">
                     <p className="eyebrow">Welcome back</p>
-                    <h2>Continue your study session</h2>
+                    <h1>Continue your study session</h1>
                     <p>Sign in to generate a new deck from your course material.</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="auth-form">
-                    <label htmlFor="username">Username</label>
-                    <input
-                        id="username"
-                        type="text"
-                        autoComplete="username"
-                        placeholder="Enter your username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                    />
+                <form onSubmit={handleSubmit} className="auth-form" aria-busy={loading} noValidate>
+                    <div className="form-field">
+                        <label htmlFor="username">Username</label>
+                        <input
+                            id="username"
+                            name="username"
+                            type="text"
+                            autoComplete="username"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            placeholder="Enter your username"
+                            minLength={3}
+                            maxLength={30}
+                            value={username}
+                            onChange={(e) => { setUsername(e.target.value); clearError(); }}
+                            disabled={loading}
+                            required
+                        />
+                    </div>
 
-                    <label htmlFor="password">Password</label>
-                    <input
+                    <PasswordField
                         id="password"
-                        type="password"
+                        name="password"
+                        label="Password"
                         autoComplete="current-password"
                         placeholder="Enter your password"
+                        minLength={8}
+                        maxLength={72}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => { setPassword(e.target.value); clearError(); }}
+                        disabled={loading}
                         required
                     />
 
-                    {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
+                    {errorMessage && <p className="form-error" id="login-error" role="alert">{errorMessage}</p>}
 
                     <button type="submit" disabled={loading} className="button button--primary button--full">
-                        {loading ? <><span className="button-spinner" /> Signing in…</> : "Sign in"}
+                        {loading ? <><span className="button-spinner" aria-hidden="true" /> Signing in…</> : "Sign in"}
                     </button>
                 </form>
 
                 <div className="auth-divider"><span>or explore first</span></div>
 
-                <button type="button" className="button button--secondary button--full" onClick={handleDemo}>
+                <button type="button" className="button button--secondary button--full" onClick={handleDemo} disabled={loading}>
                     Preview a sample deck
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
                 </button>

@@ -1,15 +1,13 @@
-import React, { type JSX } from "react";
+import type { ReactElement } from "react";
 import { Navigate } from "react-router-dom";
+import { getSessionKind } from "../lib/session";
 
-interface Props {
-    children: JSX.Element;
+interface ProtectedRouteProps {
+    children: ReactElement;
 }
 
-const ProtectedRoute: React.FC<Props> = ({ children }) => {
-    const token = localStorage.getItem("token");
-    const demoMode = sessionStorage.getItem("demoMode");
-
-    if (!token && !demoMode) {
+function ProtectedRoute({ children }: ProtectedRouteProps) {
+    if (getSessionKind() === "none") {
         return <Navigate to="/login" replace />;
     }
 

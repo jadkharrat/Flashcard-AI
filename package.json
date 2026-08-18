@@ -1,0 +1,20 @@
+{
+  "name": "recall-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turn text-based PDFs into concise flashcard decks for active recall.",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "db:setup": "node scripts/prepare-database.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm --prefix backend run test",
+    "check": "npm run lint && npm run test && npm --prefix frontend run build"
+  }
+}

@@ -1,26 +1,37 @@
+import { isRecordResponse, requestJson } from "./client";
+import { getAuthToken } from "../lib/session";
+
 export type Flashcard = {
     question: string;
     answer: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5050";
-
-async function generateFlashcards(file: File): Promise<Flashcard[]> {
+async function generateFlashcards(file: File, signal?: AbortSignal): Promise<Flashcard[]> {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${API_BASE_URL}/api/flashcards/generate`, {
+    const token = getAuthToken();
+    const data = await requestJson<unknown>("/api/flashcards/generate", {
         method: "POST",
         body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        signal,
+        timeoutMs: 120_000,
     });
 
-    if (!response.ok) {
-        const errorBody = await response.json().catch(() => null) as { error?: string } | null;
-        throw new Error(errorBody?.error || `The server returned ${response.status} ${response.statusText}.`);
+    if (!isRecordResponse(data) || !Array.isArray(data.flashcards)) {
+        throw new Error("The service returned an invalid flashcard deck. Please try again.");
     }
 
-    const data = await response.json();
-    return data.flashcards as Flashcard[] || [];
+    return data.flashcards.flatMap((card): Flashcard[] => {
+        if (!isRecordResponse(card) || typeof card.question !== "string" || typeof card.answer !== "string") {
+            return [];
+        }
+
+        const question = card.question.trim();
+        const answer = card.answer.trim();
+        return question && answer ? [{ question, answer }] : [];
+    });
 }
 
 export { generateFlashcards };

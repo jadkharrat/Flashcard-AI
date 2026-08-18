@@ -1,5 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build and test output
+dist/
+dist-ssr/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+*.local
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,42 +24,31 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Local databases and generated Prisma state
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+/backend/prisma/database_path
+/backend/prisma/database_path-*
+/backend/prisma/.prisma/
 
-# Editor directories and files
+# Temporary uploads
+uploads/
+tmp/
+
+# Editors and operating systems
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Global ignores
-.DS_Store
-node_modules/
-dist/
-build/
-.env
-.vscode/
-.idea/
-
-# Backend
-/backend/data/*.sqlite
-/backend/data/*.sqlite-journal
-/backend/.env
-/backend/node_modules/
-/backend/dist/
-/backend/prisma/.prisma/
-/backend/prisma/migrations/
-/backend/prisma.config.ts
-
-# Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/

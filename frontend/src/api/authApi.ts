@@ -1,5 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5050";
-const API_URL = `${API_BASE_URL}/api/auth`;
+import { isRecordResponse, requestJson } from "./client";
 
 interface UserInfo {
     id: number;
@@ -20,37 +19,21 @@ async function register(data: {
     name: string;
     surname: string;
 }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/register`, {
+    const response = await requestJson<unknown>("/api/auth/register", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
     });
-
-    if(!response.ok){
-        let message = "Registration failed";
-
-        try {
-            const err = await response.json();
-            if (err?.error) message = err.error;
-            else if (err?.message) message = err.message;
-        } catch {
-            const text = await response.text();
-            if (text) message = text;
-        }
-
-        throw new Error(message);
-    }
-
-    return response.json();
+    return parseAuthResponse(response);
 }
 
 async function login(data: {
     username: string;
     password: string;
 }): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/login`, {
+    const response = await requestJson<unknown>("/api/auth/login", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -58,22 +41,34 @@ async function login(data: {
         body: JSON.stringify(data),
     });
 
-    if(!response.ok){
-        let message = "Login failed";
+    return parseAuthResponse(response);
+}
 
-        try {
-            const err = await response.json();
-            if (err?.error) message = err.error;
-            else if (err?.message) message = err.message;
-        } catch {
-            const text = await response.text();
-            if (text) message = text;
-        }
-
-        throw new Error(message);
+function parseAuthResponse(value: unknown): AuthResponse {
+    if (!isRecordResponse(value) || typeof value.token !== "string" || !isRecordResponse(value.user)) {
+        throw new Error("The service returned an invalid sign-in response. Please try again.");
     }
 
-    return response.json();
+    const user = value.user;
+    if (
+        typeof user.id !== "number" ||
+        typeof user.username !== "string" ||
+        typeof user.name !== "string" ||
+        typeof user.surname !== "string"
+    ) {
+        throw new Error("The service returned incomplete account information. Please try again.");
+    }
+
+    return {
+        message: typeof value.message === "string" ? value.message : "Success",
+        token: value.token,
+        user: {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            surname: user.surname,
+        },
+    };
 }
 
 export { register, login };

@@ -7,6 +7,12 @@ interface FlashcardProps {
     flippedAll?: boolean;
 }
 
+function contentDensityClass(content: string) {
+    if (content.length > 360) return "flashcard__face--dense";
+    if (content.length > 180) return "flashcard__face--long";
+    return "";
+}
+
 function Flashcard({ card, index, flippedAll = false }: FlashcardProps) {
     const [flipped, setFlipped] = useState<boolean>(false);
 
@@ -14,16 +20,21 @@ function Flashcard({ card, index, flippedAll = false }: FlashcardProps) {
         setFlipped(flippedAll);
     }, [flippedAll]);
 
+    const visibleContent = flipped ? card.answer : card.question;
+
     return (
         <button
             type="button"
-            onClick={() => setFlipped(!flipped)}
+            onClick={() => setFlipped((value) => !value)}
             className={`flashcard ${flipped ? "flashcard--flipped" : ""}`}
-            aria-label={`Card ${index + 1}: ${flipped ? "show question" : "reveal answer"}`}
+            aria-label={`Card ${index + 1}, ${flipped ? "answer" : "question"}: ${visibleContent} — ${flipped ? "show question" : "reveal answer"}`}
             aria-pressed={flipped}
         >
             <span className="flashcard__inner">
-                <span className="flashcard__face flashcard__front">
+                <span
+                    className={`flashcard__face flashcard__front ${contentDensityClass(card.question)}`}
+                    aria-hidden={flipped}
+                >
                     <span className="flashcard__topline">
                         <span className="flashcard__number">{String(index + 1).padStart(2, "0")}</span>
                         <span className="flashcard__type">Question</span>
@@ -35,7 +46,10 @@ function Flashcard({ card, index, flippedAll = false }: FlashcardProps) {
                     </span>
                 </span>
 
-                <span className="flashcard__face flashcard__back">
+                <span
+                    className={`flashcard__face flashcard__back ${contentDensityClass(card.answer)}`}
+                    aria-hidden={!flipped}
+                >
                     <span className="flashcard__topline">
                         <span className="flashcard__number">{String(index + 1).padStart(2, "0")}</span>
                         <span className="flashcard__type">Answer</span>

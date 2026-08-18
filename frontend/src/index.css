@@ -58,13 +58,21 @@
 html {
   min-width: 320px;
   background: var(--paper);
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--paper);
+  line-height: 1.5;
+}
+
+::selection {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 button,
@@ -82,6 +90,26 @@ a:focus-visible,
 input:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 2px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  color: #ffffff;
+  background: #5042b8;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+  transform: translateY(-150%);
+  transition: transform 140ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .eyebrow {
@@ -232,6 +260,7 @@ input:focus-visible {
 .auth-page {
   display: grid;
   min-height: 100vh;
+  min-height: 100dvh;
   grid-template-columns: minmax(480px, 1.08fr) minmax(420px, 0.92fr);
   background: var(--surface);
 }
@@ -247,6 +276,8 @@ input:focus-visible {
   color: #ffffff;
   background: #1b2135;
   isolation: isolate;
+  grid-row: 1;
+  grid-column: 1;
 }
 
 .auth-story::before {
@@ -277,7 +308,7 @@ input:focus-visible {
   margin-top: clamp(50px, 8vh, 100px);
 }
 
-.auth-story__copy h1 {
+.auth-story__copy h2 {
   margin: 0;
   max-width: 620px;
   font-family: ui-rounded, "Arial Rounded MT Bold", Inter, sans-serif;
@@ -461,6 +492,8 @@ input:focus-visible {
   justify-content: center;
   padding: clamp(30px, 6vw, 82px);
   background: var(--surface);
+  grid-row: 1;
+  grid-column: 2;
 }
 
 .auth-panel__mobile-brand {
@@ -475,7 +508,7 @@ input:focus-visible {
   margin-bottom: 32px;
 }
 
-.auth-card__heading h2 {
+.auth-card__heading h1 {
   margin: 0;
   color: var(--ink);
   font-family: ui-rounded, "Arial Rounded MT Bold", Inter, sans-serif;
@@ -494,10 +527,18 @@ input:focus-visible {
 .auth-form {
   display: flex;
   flex-direction: column;
+  gap: 18px;
 }
 
-.auth-form label {
-  margin: 0 0 7px;
+.form-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-field label {
+  margin: 0;
   color: var(--ink);
   font-size: 0.8rem;
   font-weight: 750;
@@ -506,13 +547,17 @@ input:focus-visible {
 .auth-form input {
   width: 100%;
   height: 48px;
-  margin-bottom: 18px;
   border: 1px solid var(--line);
   border-radius: 11px;
   padding: 0 14px;
   color: var(--ink);
   background: var(--surface-muted);
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.auth-form input:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .auth-form input::placeholder {
@@ -524,6 +569,55 @@ input:focus-visible {
   outline: 0;
   background: var(--surface);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.field-hint {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.password-input {
+  position: relative;
+}
+
+.password-input input {
+  padding-right: 48px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: transparent;
+  cursor: pointer;
+}
+
+.password-toggle:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.password-toggle svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .form-row {
@@ -538,7 +632,7 @@ input:focus-visible {
 }
 
 .form-error {
-  margin: -2px 0 16px;
+  margin: 0;
   border-radius: 9px;
   padding: 10px 12px;
   color: var(--danger);
@@ -585,6 +679,7 @@ input:focus-visible {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--ink);
   background: var(--paper);
   transition: color 200ms ease, background-color 200ms ease;
@@ -791,6 +886,57 @@ input:focus-visible {
   padding: clamp(24px, 4vw, 42px);
 }
 
+.demo-access {
+  display: grid;
+  min-height: 218px;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 48%, var(--line));
+  border-radius: var(--radius-md);
+  padding: 30px;
+  background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--mint) 24%, var(--surface)));
+}
+
+.demo-access__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: 15px;
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.demo-access__icon svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.demo-access strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.demo-access p {
+  max-width: 520px;
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.demo-access .button {
+  flex: 0 0 auto;
+}
+
 .section-heading {
   display: flex;
   align-items: center;
@@ -926,6 +1072,14 @@ input:focus-visible {
   cursor: pointer;
   font: inherit;
   font-weight: 750;
+}
+
+.inline-button:disabled,
+.text-button:disabled,
+.sample-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  text-decoration: none;
 }
 
 .text-button {
@@ -1144,6 +1298,7 @@ input:focus-visible {
   font-family: ui-rounded, "Arial Rounded MT Bold", Inter, sans-serif;
   font-size: clamp(1.7rem, 3vw, 2.45rem);
   letter-spacing: -0.045em;
+  overflow-wrap: anywhere;
 }
 
 .deck-toolbar p:last-child {
@@ -1158,14 +1313,16 @@ input:focus-visible {
 
 .flashcard-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 22px;
 }
 
 .flashcard {
   position: relative;
+  display: grid;
   width: 100%;
-  min-height: 260px;
+  min-height: 288px;
   border: 0;
   padding: 0;
   color: var(--ink);
@@ -1175,10 +1332,14 @@ input:focus-visible {
   text-align: left;
 }
 
+.flashcard:focus-visible {
+  outline-offset: 4px;
+}
+
 .flashcard__inner {
-  position: absolute;
-  inset: 0;
-  display: block;
+  position: relative;
+  display: grid;
+  height: 100%;
   transform-style: preserve-3d;
   transition: transform 580ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
@@ -1193,35 +1354,42 @@ input:focus-visible {
 }
 
 .flashcard__face {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  overflow: auto;
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 288px;
+  grid-area: 1 / 1;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 24px;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 22px;
+  border-radius: 20px;
+  padding: 25px 28px 23px 30px;
   backface-visibility: hidden;
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 2px rgba(22, 32, 51, 0.04), 0 12px 32px rgba(22, 32, 51, 0.07);
 }
 
-.flashcard__front::after {
+.flashcard__face::before {
   position: absolute;
-  right: -24px;
-  bottom: -24px;
-  width: 80px;
-  height: 80px;
-  border: 18px solid var(--accent-soft);
-  border-radius: 50%;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
   content: "";
 }
 
 .flashcard__back {
   border-color: color-mix(in srgb, var(--mint-ink) 30%, var(--line));
-  background: color-mix(in srgb, var(--mint) 35%, var(--surface));
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--mint) 42%, var(--surface)), var(--surface) 72%);
   transform: rotateY(180deg);
+}
+
+.flashcard__back::before {
+  background: var(--mint-ink);
 }
 
 .flashcard__topline {
@@ -1232,10 +1400,11 @@ input:focus-visible {
 
 .flashcard__number {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 12px;
   color: var(--accent);
   background: var(--accent-soft);
   font-family: ui-monospace, "SFMono-Regular", monospace;
@@ -1244,12 +1413,20 @@ input:focus-visible {
 }
 
 .flashcard__back .flashcard__number {
+  border-color: color-mix(in srgb, var(--mint-ink) 20%, transparent);
   color: var(--mint-ink);
   background: var(--mint);
 }
 
 .flashcard__type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 11px;
   color: var(--ink-soft);
+  background: color-mix(in srgb, var(--surface-muted) 75%, transparent);
   font-family: ui-monospace, "SFMono-Regular", monospace;
   font-size: 0.62rem;
   font-weight: 750;
@@ -1260,21 +1437,36 @@ input:focus-visible {
 .flashcard__content {
   position: relative;
   z-index: 1;
+  align-self: center;
   display: block;
-  margin: 25px 0;
+  margin: 8px 0;
   color: var(--ink);
   font-family: ui-rounded, "Arial Rounded MT Bold", Inter, sans-serif;
-  font-size: clamp(1rem, 1.5vw, 1.22rem);
+  font-size: clamp(1.08rem, 1.55vw, 1.32rem);
   font-weight: 720;
   letter-spacing: -0.02em;
-  line-height: 1.45;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .flashcard__back .flashcard__content {
   font-family: Inter, ui-sans-serif, sans-serif;
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   font-weight: 550;
-  line-height: 1.6;
+  line-height: 1.65;
+}
+
+.flashcard__face--long .flashcard__content {
+  font-size: 0.96rem;
+  line-height: 1.58;
+}
+
+.flashcard__face--dense .flashcard__content {
+  align-self: start;
+  margin-top: 2px;
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .flashcard__hint {
@@ -1283,9 +1475,17 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: max-content;
+  border-radius: 999px;
+  padding: 7px 10px;
   color: var(--ink-soft);
-  font-size: 0.68rem;
+  background: var(--surface-muted);
+  font-size: 0.67rem;
   font-weight: 700;
+}
+
+.flashcard__back .flashcard__hint {
+  background: color-mix(in srgb, var(--mint) 55%, var(--surface));
 }
 
 .flashcard__hint svg {
@@ -1311,7 +1511,7 @@ input:focus-visible {
     padding: 40px;
   }
 
-  .auth-story__copy h1 {
+  .auth-story__copy h2 {
     font-size: clamp(2.6rem, 5.5vw, 4rem);
   }
 
@@ -1349,9 +1549,6 @@ input:focus-visible {
     grid-column: 1 / -1;
   }
 
-  .flashcard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
@@ -1369,6 +1566,7 @@ input:focus-visible {
     display: block;
     min-height: 100vh;
     padding: 30px 22px 50px;
+    grid-column: auto;
   }
 
   .auth-panel::before {
@@ -1419,6 +1617,20 @@ input:focus-visible {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .flashcard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-access {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .demo-access .button {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1460,6 +1672,14 @@ input:focus-visible {
     padding: 24px 18px;
   }
 
+  .demo-access {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px 20px;
+  }
+
   .form-row {
     grid-template-columns: 1fr;
     gap: 0;
@@ -1478,7 +1698,13 @@ input:focus-visible {
   }
 
   .flashcard {
-    min-height: 248px;
+    min-height: 260px;
+  }
+
+  .flashcard__face {
+    min-height: 260px;
+    gap: 20px;
+    padding: 22px 22px 20px 25px;
   }
 }
 

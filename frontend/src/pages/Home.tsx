@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FileUploader from "../components/FileUploader";
 import Loader from "../components/Loader";
@@ -6,6 +6,8 @@ import Flashcard from "../components/Flashcard";
 import Brand from "../components/Brand";
 import { generateFlashcards, type Flashcard as FlashcardType } from "../api/flashcardApi";
 import ThemeToggle from "../components/ThemeToggle";
+import { ApiError } from "../api/client";
+import { clearSession, getSessionKind, getSessionUser } from "../lib/session";
 
 const SAMPLE_DECK: FlashcardType[] = [
     {
@@ -34,49 +36,65 @@ const SAMPLE_DECK: FlashcardType[] = [
     },
 ];
 
-interface StoredUser {
-    name?: string;
-    username?: string;
-}
-
-function getStoredUser(): StoredUser | null {
-    try {
-        const value = localStorage.getItem("user");
-        return value ? JSON.parse(value) as StoredUser : null;
-    } catch {
-        return null;
-    }
-}
-
 function Home() {
     const navigate = useNavigate();
-    const isDemo = sessionStorage.getItem("demoMode") === "true";
-    const user = getStoredUser();
+    const isDemo = getSessionKind() === "demo";
+    const user = getSessionUser();
     const [flashcards, setFlashcards] = useState<FlashcardType[]>(() => isDemo ? SAMPLE_DECK : []);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [flippedAll, setFlippedAll] = useState<boolean>(false);
     const [deckTitle, setDeckTitle] = useState<string>(() => isDemo ? "Learning science & AI" : "");
+    const deckRef = useRef<HTMLElement>(null);
+    const activeRequest = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        document.title = "Study workspace — RecallAI";
+        return () => activeRequest.current?.abort();
+    }, []);
+
+    const scrollToDeck = () => {
+        window.setTimeout(() => {
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            deckRef.current?.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+        }, 0);
+    };
 
     const handleUpload = async (file: File) => {
+        const controller = new AbortController();
+        activeRequest.current?.abort();
+        activeRequest.current = controller;
         setError(null);
         setLoading(true);
         setFlippedAll(false);
         try {
-            const cards = await generateFlashcards(file);
+            const cards = await generateFlashcards(file, controller.signal);
             if (cards.length === 0) {
                 throw new Error("No flashcards were generated. Try a PDF with more readable text.");
             }
             setFlashcards(cards);
             setDeckTitle(file.name.replace(/\.pdf$/i, ""));
+            scrollToDeck();
         } catch (err: unknown) {
+            if (err instanceof ApiError && err.kind === "aborted") return;
+            if (err instanceof ApiError && err.status === 401) {
+                clearSession();
+                navigate("/login", {
+                    replace: true,
+                    state: { notice: "Your session expired. Sign in again to generate a deck." },
+                });
+                return;
+            }
             if (err instanceof Error) {
                 setError(err.message);
             } else {
                 setError("We couldn't generate this deck. Please try another PDF.");
             }
         } finally {
-            setLoading(false);
+            if (activeRequest.current === controller) {
+                activeRequest.current = null;
+                setLoading(false);
+            }
         }
     };
 
@@ -85,16 +103,22 @@ function Home() {
         setFlippedAll(false);
         setDeckTitle("Learning science & AI");
         setFlashcards(SAMPLE_DECK);
+        scrollToDeck();
     };
 
     const handleSignOut = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        sessionStorage.removeItem("demoMode");
-        navigate("/login");
+        activeRequest.current?.abort();
+        clearSession();
+        navigate("/login", { replace: true });
     };
 
-    const displayName = isDemo ? "Guest preview" : (user?.name || user?.username || "My workspace");
+    const handleCreateAccount = () => {
+        clearSession();
+        navigate("/register", { replace: true });
+    };
+
+    const fullName = [user?.name, user?.surname].filter(Boolean).join(" ");
+    const displayName = isDemo ? "Guest preview" : (fullName || user?.username || "My workspace");
 
     return (
         <div className="app-shell">
@@ -107,7 +131,7 @@ function Home() {
                             {displayName}
                         </span>
                         <ThemeToggle />
-                        <button type="button" className="icon-button" onClick={handleSignOut} aria-label="Sign out" title="Sign out">
+                        <button type="button" className="icon-button" onClick={handleSignOut} aria-label={isDemo ? "Exit preview" : "Sign out"} title={isDemo ? "Exit preview" : "Sign out"}>
                             <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M10 5H6.5A2.5 2.5 0 0 0 4 7.5v9A2.5 2.5 0 0 0 6.5 19H10M14 8l4 4-4 4M18 12H9" />
                             </svg>
@@ -116,7 +140,7 @@ function Home() {
                 </div>
             </header>
 
-            <main className="workspace">
+            <main className="workspace" id="main-content">
                 <section className="workspace-hero">
                     <div>
                         <p className="eyebrow">Your AI study desk</p>
@@ -141,12 +165,25 @@ function Home() {
                                 <svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20H7z" /><path d="M14 3.5v4h4M10 12h5M10 15.5h5" /></svg>
                             </span>
                             <div>
-                                <p className="eyebrow">Create a new deck</p>
-                                <h2>Choose your source material</h2>
+                                <p className="eyebrow">{isDemo ? "Sample workspace" : "Create a new deck"}</p>
+                                <h2>{isDemo ? "Turn your own notes into a deck" : "Choose your source material"}</h2>
                             </div>
                         </div>
 
-                        <FileUploader onUpload={handleUpload} loading={loading} onLoadSample={loadSampleDeck} />
+                        {isDemo ? (
+                            <div className="demo-access">
+                                <span className="demo-access__icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24"><path d="M8 10V7a4 4 0 0 1 8 0v3M6 10h12v10H6z" /></svg>
+                                </span>
+                                <div>
+                                    <strong>Create an account to upload a PDF</strong>
+                                    <p>You can explore the sample deck below without signing up. When you are ready, create an account to generate one from your own material.</p>
+                                </div>
+                                <button type="button" className="button button--primary" onClick={handleCreateAccount}>Create an account</button>
+                            </div>
+                        ) : (
+                            <FileUploader onUpload={handleUpload} loading={loading} onLoadSample={loadSampleDeck} />
+                        )}
                         {loading && <Loader />}
                         {error && (
                             <div className="error-message" role="alert">
@@ -175,18 +212,18 @@ function Home() {
                         </ol>
                         <div className="privacy-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3M6 10h12v10H6z" /></svg>
-                            <span><strong>Private by design</strong>Your file is processed only to create the deck.</span>
+                            <span><strong>Temporary processing</strong>Your PDF is read to create the deck and is not stored by RecallAI.</span>
                         </div>
                     </aside>
                 </section>
 
                 {flashcards.length > 0 && (
-                    <section className="deck-section" aria-labelledby="deck-heading">
+                    <section className="deck-section" ref={deckRef} aria-labelledby="deck-heading">
                         <div className="deck-toolbar">
                             <div>
                                 <p className="eyebrow">Ready to review</p>
                                 <h2 id="deck-heading">{deckTitle}</h2>
-                                <p>{flashcards.length} cards · Click any card to reveal its answer</p>
+                                <p>{flashcards.length} cards · Select any card to reveal its answer</p>
                             </div>
                             <button
                                 type="button"

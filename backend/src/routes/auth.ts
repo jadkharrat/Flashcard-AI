@@ -1,22 +1,24 @@
+import { Prisma } from "@prisma/client";
 import { Router } from "express";
-import prisma from "../database/connection.ts";
-import { hashPassword, verifyPassword } from "../utils/hash.ts";
-import { generateToken } from "../utils/token.ts";
+import prisma from "../database/connection.js";
+import { hashPassword, verifyPassword } from "../utils/hash.js";
+import { generateToken } from "../utils/token.js";
+import {
+    firstValidationError,
+    loginBodySchema,
+    registerBodySchema,
+} from "../validation/auth.js";
 
 const router = Router();
 
-router.post("/register", async (req, res) => {
+router.post("/register", async (req, res, next) => {
     try {
-        const { username, password, name, surname } = req.body;
-
-        if (!username || !password || !name || !surname) {
-            return res.status(400).json({ error: "All fields are required" });
+        const body = registerBodySchema.safeParse(req.body);
+        if (!body.success) {
+            return res.status(400).json({ error: firstValidationError(body.error) });
         }
 
-        if (password.length < 8) {
-            return res.status(400).json({ error: "Password must be at least 8 characters" });
-        }
-        
+        const { username, password, name, surname } = body.data;
         const existingUser = await prisma.user.findUnique({ where: { username } });
         if (existingUser) {
             return res.status(409).json({ error: "Username already exists" });
@@ -46,19 +48,23 @@ router.post("/register", async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error during registration:", error);
-        return res.status(500).json({ error: "Internal server error" });
-    }
-})
-
-router.post("/login", async (req, res) => {
-    try {
-        const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ error: "Username and password are required" });
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            return res.status(409).json({ error: "Username already exists" });
         }
 
+        next(error);
+        return;
+    }
+});
+
+router.post("/login", async (req, res, next) => {
+    try {
+        const body = loginBodySchema.safeParse(req.body);
+        if (!body.success) {
+            return res.status(400).json({ error: firstValidationError(body.error) });
+        }
+
+        const { username, password } = body.data;
         const user = await prisma.user.findUnique({ where: { username } });
         if (!user) {
             return res.status(401).json({ error: "Invalid username or password" });
@@ -81,9 +87,9 @@ router.post("/login", async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Error during login:", error);
-        return res.status(500).json({ error: "Internal server error" });
+        next(error);
+        return;
     }
-})
+});
 
 export default router;
