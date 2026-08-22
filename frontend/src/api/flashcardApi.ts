@@ -1,4 +1,5 @@
 import { isRecordResponse, requestJson } from "./client";
+import { parseDeckDetail, type DeckDetail } from "./deckApi";
 import { getAuthToken } from "../lib/session";
 
 export type Flashcard = {
@@ -6,7 +7,7 @@ export type Flashcard = {
     answer: string;
 }
 
-async function generateFlashcards(file: File, signal?: AbortSignal): Promise<Flashcard[]> {
+async function generateFlashcards(file: File, signal?: AbortSignal): Promise<DeckDetail> {
     const formData = new FormData();
     formData.append("file", file);
 
@@ -19,19 +20,11 @@ async function generateFlashcards(file: File, signal?: AbortSignal): Promise<Fla
         timeoutMs: 120_000,
     });
 
-    if (!isRecordResponse(data) || !Array.isArray(data.flashcards)) {
+    if (!isRecordResponse(data)) {
         throw new Error("The service returned an invalid flashcard deck. Please try again.");
     }
 
-    return data.flashcards.flatMap((card): Flashcard[] => {
-        if (!isRecordResponse(card) || typeof card.question !== "string" || typeof card.answer !== "string") {
-            return [];
-        }
-
-        const question = card.question.trim();
-        const answer = card.answer.trim();
-        return question && answer ? [{ question, answer }] : [];
-    });
+    return parseDeckDetail(data.deck);
 }
 
 export { generateFlashcards };

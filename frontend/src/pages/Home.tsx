@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FileUploader from "../components/FileUploader";
 import Loader from "../components/Loader";
 import Flashcard from "../components/Flashcard";
+import DeckLibrary from "../components/DeckLibrary";
 import Brand from "../components/Brand";
+import { deleteDeck, getDeck, listDecks, type DeckSummary } from "../api/deckApi";
 import { generateFlashcards, type Flashcard as FlashcardType } from "../api/flashcardApi";
 import ThemeToggle from "../components/ThemeToggle";
 import { ApiError } from "../api/client";
@@ -45,13 +47,61 @@ function Home() {
     const [error, setError] = useState<string | null>(null);
     const [flippedAll, setFlippedAll] = useState<boolean>(false);
     const [deckTitle, setDeckTitle] = useState<string>(() => isDemo ? "Learning science & AI" : "");
+    const [activeDeckId, setActiveDeckId] = useState<number | null>(null);
+    const [savedDecks, setSavedDecks] = useState<DeckSummary[]>([]);
+    const [libraryLoading, setLibraryLoading] = useState<boolean>(false);
+    const [libraryError, setLibraryError] = useState<string | null>(null);
+    const [openingDeckId, setOpeningDeckId] = useState<number | null>(null);
+    const [deletingDeckId, setDeletingDeckId] = useState<number | null>(null);
     const deckRef = useRef<HTMLElement>(null);
     const activeRequest = useRef<AbortController | null>(null);
+    const libraryRequest = useRef<AbortController | null>(null);
+    const deckRequest = useRef<AbortController | null>(null);
+
+    const handleExpiredSession = useCallback(() => {
+        clearSession();
+        navigate("/login", {
+            replace: true,
+            state: { notice: "Your session expired. Sign in again to continue." },
+        });
+    }, [navigate]);
+
+    const loadSavedDecks = useCallback(async () => {
+        if (isDemo) return;
+
+        const controller = new AbortController();
+        libraryRequest.current?.abort();
+        libraryRequest.current = controller;
+        setLibraryLoading(true);
+        setLibraryError(null);
+
+        try {
+            setSavedDecks(await listDecks(controller.signal));
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.kind === "aborted") return;
+            if (err instanceof ApiError && err.status === 401) {
+                handleExpiredSession();
+                return;
+            }
+            setLibraryError(err instanceof Error ? err.message : "Saved decks could not be loaded.");
+        } finally {
+            if (libraryRequest.current === controller) {
+                libraryRequest.current = null;
+                setLibraryLoading(false);
+            }
+        }
+    }, [handleExpiredSession, isDemo]);
 
     useEffect(() => {
         document.title = "Study workspace — RecallAI";
-        return () => activeRequest.current?.abort();
-    }, []);
+        if (!isDemo) void loadSavedDecks();
+
+        return () => {
+            activeRequest.current?.abort();
+            libraryRequest.current?.abort();
+            deckRequest.current?.abort();
+        };
+    }, [isDemo, loadSavedDecks]);
 
     const scrollToDeck = () => {
         window.setTimeout(() => {
@@ -68,21 +118,19 @@ function Home() {
         setLoading(true);
         setFlippedAll(false);
         try {
-            const cards = await generateFlashcards(file, controller.signal);
-            if (cards.length === 0) {
+            const savedDeck = await generateFlashcards(file, controller.signal);
+            if (savedDeck.cards.length === 0) {
                 throw new Error("No flashcards were generated. Try a PDF with more readable text.");
             }
-            setFlashcards(cards);
-            setDeckTitle(file.name.replace(/\.pdf$/i, ""));
+            setFlashcards(savedDeck.cards);
+            setDeckTitle(savedDeck.title);
+            setActiveDeckId(savedDeck.id);
+            setSavedDecks((current) => [savedDeck, ...current.filter((deck) => deck.id !== savedDeck.id)]);
             scrollToDeck();
         } catch (err: unknown) {
             if (err instanceof ApiError && err.kind === "aborted") return;
             if (err instanceof ApiError && err.status === 401) {
-                clearSession();
-                navigate("/login", {
-                    replace: true,
-                    state: { notice: "Your session expired. Sign in again to generate a deck." },
-                });
+                handleExpiredSession();
                 return;
             }
             if (err instanceof Error) {
@@ -102,17 +150,78 @@ function Home() {
         setError(null);
         setFlippedAll(false);
         setDeckTitle("Learning science & AI");
+        setActiveDeckId(null);
         setFlashcards(SAMPLE_DECK);
         scrollToDeck();
     };
 
+    const handleOpenDeck = async (deckId: number) => {
+        const controller = new AbortController();
+        deckRequest.current?.abort();
+        deckRequest.current = controller;
+        setOpeningDeckId(deckId);
+        setLibraryError(null);
+
+        try {
+            const savedDeck = await getDeck(deckId, controller.signal);
+            setFlashcards(savedDeck.cards);
+            setDeckTitle(savedDeck.title);
+            setActiveDeckId(savedDeck.id);
+            setFlippedAll(false);
+            scrollToDeck();
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.kind === "aborted") return;
+            if (err instanceof ApiError && err.status === 401) {
+                handleExpiredSession();
+                return;
+            }
+            setLibraryError(err instanceof Error ? err.message : "That deck could not be opened.");
+        } finally {
+            if (deckRequest.current === controller) {
+                deckRequest.current = null;
+                setOpeningDeckId(null);
+            }
+        }
+    };
+
+    const handleDeleteDeck = async (deck: DeckSummary) => {
+        const confirmed = window.confirm(`Delete “${deck.title}”? This also removes all ${deck.cardCount} cards.`);
+        if (!confirmed) return;
+
+        setDeletingDeckId(deck.id);
+        setLibraryError(null);
+        try {
+            await deleteDeck(deck.id);
+            setSavedDecks((current) => current.filter((savedDeck) => savedDeck.id !== deck.id));
+            if (activeDeckId === deck.id) {
+                setActiveDeckId(null);
+                setFlashcards([]);
+                setDeckTitle("");
+                setFlippedAll(false);
+            }
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.status === 401) {
+                handleExpiredSession();
+                return;
+            }
+            setLibraryError(err instanceof Error ? err.message : "That deck could not be deleted.");
+        } finally {
+            setDeletingDeckId(null);
+        }
+    };
+
     const handleSignOut = () => {
         activeRequest.current?.abort();
+        libraryRequest.current?.abort();
+        deckRequest.current?.abort();
         clearSession();
         navigate("/login", { replace: true });
     };
 
     const handleCreateAccount = () => {
+        activeRequest.current?.abort();
+        libraryRequest.current?.abort();
+        deckRequest.current?.abort();
         clearSession();
         navigate("/register", { replace: true });
     };
@@ -212,10 +321,23 @@ function Home() {
                         </ol>
                         <div className="privacy-note">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V7a4 4 0 0 1 8 0v3M6 10h12v10H6z" /></svg>
-                            <span><strong>Temporary processing</strong>Your PDF is read to create the deck and is not stored by RecallAI.</span>
+                            <span><strong>Private source processing</strong>Your PDF is processed temporarily; only your generated deck is saved.</span>
                         </div>
                     </aside>
                 </section>
+
+                {!isDemo && (
+                    <DeckLibrary
+                        decks={savedDecks}
+                        loading={libraryLoading}
+                        error={libraryError}
+                        openingDeckId={openingDeckId}
+                        deletingDeckId={deletingDeckId}
+                        onOpen={handleOpenDeck}
+                        onDelete={handleDeleteDeck}
+                        onRetry={loadSavedDecks}
+                    />
+                )}
 
                 {flashcards.length > 0 && (
                     <section className="deck-section" ref={deckRef} aria-labelledby="deck-heading">

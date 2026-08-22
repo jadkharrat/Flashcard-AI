@@ -15,7 +15,10 @@ export async function connectDatabase(): Promise<void> {
     await prisma.$connect();
 
     try {
-        await prisma.user.count();
+        await prisma.$transaction([
+            prisma.user.count(),
+            prisma.deck.count(),
+        ]);
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021") {
             throw new Error(

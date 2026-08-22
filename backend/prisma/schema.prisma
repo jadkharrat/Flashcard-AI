@@ -15,4 +15,33 @@ model User {
   surname   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  decks     Deck[]
+}
+
+model Deck {
+  id              Int      @id @default(autoincrement())
+  title           String
+  sourceName      String
+  sourcePageCount Int
+  sourceTruncated Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards           Card[]
+
+  @@index([userId, updatedAt])
+}
+
+model Card {
+  id        Int      @id @default(autoincrement())
+  question  String
+  answer    String
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deckId    Int
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, position])
 }

@@ -1,14 +1,16 @@
-import { extname } from "node:path";
+import { basename, extname } from "node:path";
 import { Router } from "express";
 import multer from "multer";
 import { AppError } from "../errors/AppError.js";
 import { requireAuthentication } from "../middleware/authenticate.js";
+import { saveGeneratedDeck, serializeDeckDetail } from "../services/deckService.js";
 import { generateFlashcardsFromText } from "../services/openaiService.js";
 import {
     extractTextFromPDF,
     hasPdfSignature,
     MAX_PDF_BYTES,
 } from "../services/pdfParser.js";
+import type { AuthenticationToken } from "../utils/token.js";
 
 const router = Router();
 const acceptedMimeTypes = new Set(["application/pdf", "application/x-pdf", "application/octet-stream"]);
@@ -31,12 +33,24 @@ const upload = multer({
     },
 });
 
+function deckNames(originalName: string): { sourceName: string; title: string } {
+    const sourceName = basename(originalName.trim() || "Uploaded document.pdf").slice(0, 255);
+    const extension = extname(sourceName);
+    const stem = basename(sourceName, extension).replace(/\s+/g, " ").trim();
+
+    return {
+        sourceName,
+        title: (stem || "Untitled deck").slice(0, 120),
+    };
+}
+
 router.post("/generate", requireAuthentication, upload.single("file"), async (req, res, next) => {
     try {
-        const buffer = req.file?.buffer;
-        if (!buffer) {
+        const uploadedFile = req.file;
+        if (!uploadedFile) {
             return res.status(400).json({ error: "No file uploaded" });
         }
+        const buffer = uploadedFile.buffer;
 
         if (!hasPdfSignature(buffer)) {
             throw new AppError(415, "The uploaded file is not a valid PDF", "INVALID_PDF_SIGNATURE");
@@ -52,11 +66,24 @@ router.post("/generate", requireAuthentication, upload.single("file"), async (re
         }
 
         const generated = await generateFlashcardsFromText(extracted.text);
-        return res.json({
+        const sourceTruncated = extracted.extractionTruncated || generated.sourceTruncated;
+        const names = deckNames(uploadedFile.originalname);
+        const authentication = res.locals.auth as AuthenticationToken;
+        const savedDeck = await saveGeneratedDeck({
+            userId: authentication.id,
+            title: names.title,
+            sourceName: names.sourceName,
+            sourcePageCount: extracted.pageCount,
+            sourceTruncated,
+            flashcards: generated.flashcards,
+        });
+
+        return res.status(201).json({
+            deck: serializeDeckDetail(savedDeck),
             flashcards: generated.flashcards,
             meta: {
                 pageCount: extracted.pageCount,
-                sourceTruncated: extracted.extractionTruncated || generated.sourceTruncated,
+                sourceTruncated,
             },
         });
     } catch (error) {

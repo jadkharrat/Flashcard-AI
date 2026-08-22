@@ -8,6 +8,7 @@ import prisma from "./database/connection.js";
 import { AppError } from "./errors/AppError.js";
 import { errorHandler, notFoundHandler } from "./middleware/errors.js";
 import authRoutes from "./routes/auth.js";
+import deckRoutes from "./routes/decks.js";
 import flashcardRoutes from "./routes/flashcards.js";
 
 const authRateLimiter = rateLimit({
@@ -51,7 +52,7 @@ export function createApp(): express.Express {
             callback(new AppError(403, "Origin is not allowed", "CORS_ORIGIN_DENIED"));
         },
         allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
-        methods: ["GET", "POST", "OPTIONS"],
+        methods: ["GET", "POST", "DELETE", "OPTIONS"],
         maxAge: 86_400,
     }));
     app.use(express.json({ limit: "32kb", strict: true }));
@@ -80,6 +81,7 @@ export function createApp(): express.Express {
 
     app.use("/api/auth", authRateLimiter, authRoutes);
     app.use("/api/flashcards", generationRateLimiter, flashcardRoutes);
+    app.use("/api/decks", deckRoutes);
 
     app.use(notFoundHandler);
     app.use(errorHandler);

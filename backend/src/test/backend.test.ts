@@ -30,7 +30,8 @@ execFileSync(process.execPath, [prismaCli, "migrate", "deploy"], {
 
 const [
     { createApp },
-    { connectDatabase, disconnectDatabase },
+    { connectDatabase, disconnectDatabase, prisma },
+    { saveGeneratedDeck },
     { prepareSourceText },
     { hasPdfSignature },
     { generateToken, verifyToken },
@@ -38,6 +39,7 @@ const [
 ] = await Promise.all([
     import("../app.js"),
     import("../database/connection.js"),
+    import("../services/deckService.js"),
     import("../services/openaiService.js"),
     import("../services/pdfParser.js"),
     import("../utils/token.js"),
@@ -157,11 +159,65 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     assert.equal(registrationResponse.status, 201);
     const registration = await registrationResponse.json() as {
         token: string;
-        user: { username: string; password?: string };
+        user: { id: number; username: string; password?: string };
     };
     assert.equal(registration.user.username, "portfolio.user");
     assert.equal(registration.user.password, undefined);
     assert.ok(registration.token);
+
+    const unauthenticatedDeckList = await fetch(`${baseUrl}/api/decks`);
+    assert.equal(unauthenticatedDeckList.status, 401);
+    await unauthenticatedDeckList.json();
+
+    const savedDeck = await saveGeneratedDeck({
+        userId: registration.user.id,
+        title: "Integration Study Guide",
+        sourceName: "integration.pdf",
+        sourcePageCount: 3,
+        sourceTruncated: false,
+        flashcards: [
+            { question: "First question?", answer: "First answer." },
+            { question: "Second question?", answer: "Second answer." },
+        ],
+    });
+
+    const deckListResponse = await fetch(`${baseUrl}/api/decks`, {
+        headers: { authorization: `Bearer ${registration.token}` },
+    });
+    assert.equal(deckListResponse.status, 200);
+    const deckList = await deckListResponse.json() as {
+        decks: Array<{ id: number; cardCount: number; title: string }>;
+    };
+    assert.equal(deckList.decks.length, 1);
+    assert.equal(deckList.decks[0]?.id, savedDeck.id);
+    assert.equal(deckList.decks[0]?.cardCount, 2);
+    assert.equal(deckList.decks[0]?.title, "Integration Study Guide");
+
+    const deckDetailResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        headers: { authorization: `Bearer ${registration.token}` },
+    });
+    assert.equal(deckDetailResponse.status, 200);
+    const deckDetail = await deckDetailResponse.json() as {
+        deck: { cards: Array<{ question: string; position: number }> };
+    };
+    assert.deepEqual(
+        deckDetail.deck.cards.map((card) => [card.position, card.question]),
+        [[0, "First question?"], [1, "Second question?"]],
+    );
+
+    const otherUserToken = generateToken({ id: registration.user.id + 999, username: "other-user" });
+    const forbiddenDeckResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        headers: { authorization: `Bearer ${otherUserToken}` },
+    });
+    assert.equal(forbiddenDeckResponse.status, 404);
+    await forbiddenDeckResponse.json();
+
+    const forbiddenDeleteResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${otherUserToken}` },
+    });
+    assert.equal(forbiddenDeleteResponse.status, 404);
+    await forbiddenDeleteResponse.json();
 
     const duplicateResponse = await fetch(`${baseUrl}/api/auth/register`, {
         method: "POST",
@@ -227,6 +283,20 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     });
     assert.equal(malformedJson.status, 400);
     await malformedJson.json();
+
+    const deleteDeckResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${registration.token}` },
+    });
+    assert.equal(deleteDeckResponse.status, 200);
+    await deleteDeckResponse.json();
+    assert.equal(await prisma.card.count({ where: { deckId: savedDeck.id } }), 0);
+
+    const deletedDeckResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        headers: { authorization: `Bearer ${registration.token}` },
+    });
+    assert.equal(deletedDeckResponse.status, 404);
+    await deletedDeckResponse.json();
 
     const missingRoute = await fetch(`${baseUrl}/api/not-real`);
     assert.equal(missingRoute.status, 404);
