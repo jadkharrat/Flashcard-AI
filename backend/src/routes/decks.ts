@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import prisma from "../database/connection.js";
 import { AppError } from "../errors/AppError.js";
 import { requireAuthentication } from "../middleware/authenticate.js";
@@ -7,13 +8,26 @@ import {
     serializeDeckSummary,
     updateOwnedDeck,
 } from "../services/deckService.js";
+import { generateFlashcardRewrite } from "../services/openaiService.js";
 import type { AuthenticationToken } from "../utils/token.js";
 import {
     firstDeckValidationError,
     updateDeckBodySchema,
 } from "../validation/decks.js";
+import {
+    firstFlashcardValidationError,
+    regenerateCardBodySchema,
+} from "../validation/flashcards.js";
 
 const router = Router();
+const cardRewriteRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1_000,
+    limit: 20,
+    keyGenerator: (_req, res) => `user:${authenticatedUserId(res.locals)}`,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Card rewrite limit reached. Please try again later." },
+});
 
 function authenticatedUserId(locals: Record<string, unknown>): number {
     return (locals.auth as AuthenticationToken).id;
@@ -34,6 +48,37 @@ function parseDeckId(value: string | string[] | undefined): number {
 }
 
 router.use(requireAuthentication);
+
+router.post("/:deckId/cards/regenerate", cardRewriteRateLimiter, async (req, res, next) => {
+    try {
+        const body = regenerateCardBodySchema.safeParse(req.body);
+        if (!body.success) {
+            res.status(400).json({ error: firstFlashcardValidationError(body.error) });
+            return;
+        }
+
+        const deckId = parseDeckId(req.params.deckId);
+        const ownedDeck = await prisma.deck.findFirst({
+            where: {
+                id: deckId,
+                userId: authenticatedUserId(res.locals),
+                ...(body.data.cardId === undefined
+                    ? {}
+                    : { cards: { some: { id: body.data.cardId } } }),
+            },
+            select: { id: true },
+        });
+
+        if (!ownedDeck) {
+            throw new AppError(404, "Deck or card not found", "DECK_CARD_NOT_FOUND");
+        }
+
+        const suggestion = await generateFlashcardRewrite(body.data);
+        res.json({ suggestion });
+    } catch (error) {
+        next(error);
+    }
+});
 
 router.get("/", async (_req, res, next) => {
     try {

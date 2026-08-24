@@ -34,6 +34,20 @@ export type UpdateDeckInput = {
     cards: EditableCardInput[];
 };
 
+export type CardRewriteGoal = "clearer" | "simpler" | "challenging" | "concise";
+
+export type RegenerateCardInput = {
+    cardId?: number;
+    question: string;
+    answer: string;
+    goal: CardRewriteGoal;
+};
+
+export type CardSuggestion = {
+    question: string;
+    answer: string;
+};
+
 function authorizationHeaders() {
     const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -135,6 +149,37 @@ export async function updateDeck(deckId: number, changes: UpdateDeckInput): Prom
     }
 
     return parseDeckDetail(data.deck);
+}
+
+export async function regenerateCard(
+    deckId: number,
+    card: RegenerateCardInput,
+): Promise<CardSuggestion> {
+    const data = await requestJson<unknown>(`/api/decks/${deckId}/cards/regenerate`, {
+        method: "POST",
+        headers: {
+            ...authorizationHeaders(),
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(card),
+        timeoutMs: 75_000,
+    });
+
+    if (
+        !isRecordResponse(data)
+        || !isRecordResponse(data.suggestion)
+        || typeof data.suggestion.question !== "string"
+        || typeof data.suggestion.answer !== "string"
+        || !data.suggestion.question.trim()
+        || !data.suggestion.answer.trim()
+    ) {
+        throw new Error("The service returned an invalid card rewrite. Please try again.");
+    }
+
+    return {
+        question: data.suggestion.question.trim(),
+        answer: data.suggestion.answer.trim(),
+    };
 }
 
 export async function deleteDeck(deckId: number): Promise<void> {

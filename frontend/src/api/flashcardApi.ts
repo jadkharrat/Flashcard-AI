@@ -7,9 +7,22 @@ export type Flashcard = {
     answer: string;
 }
 
-async function generateFlashcards(file: File, signal?: AbortSignal): Promise<DeckDetail> {
+export type GenerationPreferences = {
+    cardCount: 8 | 12 | 15;
+    difficulty: "foundation" | "standard" | "advanced";
+    focus: "balanced" | "key-ideas" | "definitions" | "application";
+};
+
+async function generateFlashcards(
+    file: File,
+    preferences: GenerationPreferences,
+    signal?: AbortSignal,
+): Promise<DeckDetail> {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("cardCount", String(preferences.cardCount));
+    formData.append("difficulty", preferences.difficulty);
+    formData.append("focus", preferences.focus);
 
     const token = getAuthToken();
     const data = await requestJson<unknown>("/api/flashcards/generate", {

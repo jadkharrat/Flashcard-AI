@@ -11,16 +11,22 @@ import {
     MAX_PDF_BYTES,
 } from "../services/pdfParser.js";
 import type { AuthenticationToken } from "../utils/token.js";
+import {
+    firstFlashcardValidationError,
+    generationPreferencesSchema,
+} from "../validation/flashcards.js";
 
 const router = Router();
 const acceptedMimeTypes = new Set(["application/pdf", "application/x-pdf", "application/octet-stream"]);
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-        fieldSize: 1_024,
-        fields: 0,
+        fieldNameSize: 64,
+        fieldSize: 128,
+        fields: 3,
         fileSize: MAX_PDF_BYTES,
         files: 1,
+        parts: 4,
     },
     fileFilter: (_req, file, callback) => {
         const hasPdfExtension = extname(file.originalname).toLowerCase() === ".pdf";
@@ -50,6 +56,10 @@ router.post("/generate", requireAuthentication, upload.single("file"), async (re
         if (!uploadedFile) {
             return res.status(400).json({ error: "No file uploaded" });
         }
+        const preferences = generationPreferencesSchema.safeParse(req.body);
+        if (!preferences.success) {
+            return res.status(400).json({ error: firstFlashcardValidationError(preferences.error) });
+        }
         const buffer = uploadedFile.buffer;
 
         if (!hasPdfSignature(buffer)) {
@@ -65,7 +75,7 @@ router.post("/generate", requireAuthentication, upload.single("file"), async (re
             );
         }
 
-        const generated = await generateFlashcardsFromText(extracted.text);
+        const generated = await generateFlashcardsFromText(extracted.text, preferences.data);
         const sourceTruncated = extracted.extractionTruncated || generated.sourceTruncated;
         const names = deckNames(uploadedFile.originalname);
         const authentication = res.locals.auth as AuthenticationToken;
@@ -84,6 +94,7 @@ router.post("/generate", requireAuthentication, upload.single("file"), async (re
             meta: {
                 pageCount: extracted.pageCount,
                 sourceTruncated,
+                preferences: preferences.data,
             },
         });
     } catch (error) {

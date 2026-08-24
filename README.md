@@ -7,9 +7,10 @@ The built-in sample deck works without an account or API key, making the project
 ## What it includes
 
 - Drag-and-drop PDF uploads with file type and 10 MB size validation
-- AI-generated decks focused on the key ideas in a document
+- AI-generated decks with selectable length, challenge level, and learning emphasis
 - A private saved-deck library so generated cards survive refreshes and later sessions
 - A deck workshop for renaming decks and adding, editing, deleting, or reordering cards
+- AI-assisted card rewrites for clearer, simpler, more challenging, or more concise drafts
 - Interactive, keyboard-accessible study cards and reveal-all controls
 - Registration and login with hashed passwords and expiring JWT sessions
 - A responsive interface with light and dark themes
@@ -17,6 +18,7 @@ The built-in sample deck works without an account or API key, making the project
 - Clear loading, validation, and server error states
 
 Uploaded PDF files are processed temporarily and are not retained. The generated deck and its cards are saved to the user's local account database.
+AI card rewrites use only the card text currently shown in the editor and are saved only when the user selects **Save changes**.
 
 ## Technology
 

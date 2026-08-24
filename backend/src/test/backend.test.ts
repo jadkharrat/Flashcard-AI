@@ -32,10 +32,11 @@ const [
     { createApp },
     { connectDatabase, disconnectDatabase, prisma },
     { saveGeneratedDeck },
-    { prepareSourceText },
+    { buildGenerationSystemPrompt, buildRewriteSystemPrompt, prepareSourceText },
     { hasPdfSignature },
     { generateToken, verifyToken },
     { registerBodySchema },
+    { generationPreferencesSchema, regenerateCardBodySchema },
 ] = await Promise.all([
     import("../app.js"),
     import("../database/connection.js"),
@@ -44,6 +45,7 @@ const [
     import("../services/pdfParser.js"),
     import("../utils/token.js"),
     import("../validation/auth.js"),
+    import("../validation/flashcards.js"),
 ]);
 
 const app = createApp();
@@ -122,6 +124,51 @@ test("source preparation keeps representative excerpts within the model limit", 
     assert.match(prepared.text, /^A+/);
     assert.match(prepared.text, /MIDDLE/);
     assert.match(prepared.text, /Z+$/);
+});
+
+test("AI options apply safe defaults and reject unsupported values", () => {
+    const defaults = generationPreferencesSchema.safeParse({});
+    assert.equal(defaults.success, true);
+    if (defaults.success) {
+        assert.deepEqual(defaults.data, {
+            cardCount: 12,
+            difficulty: "standard",
+            focus: "balanced",
+        });
+    }
+
+    const personalized = generationPreferencesSchema.safeParse({
+        cardCount: "15",
+        difficulty: "advanced",
+        focus: "application",
+    });
+    assert.equal(personalized.success, true);
+    if (personalized.success) {
+        assert.equal(personalized.data.cardCount, 15);
+    }
+
+    assert.equal(generationPreferencesSchema.safeParse({ cardCount: "100" }).success, false);
+    assert.equal(regenerateCardBodySchema.safeParse({
+        question: "  What is recall?  ",
+        answer: "  Retrieving knowledge from memory.  ",
+        goal: "clearer",
+    }).success, true);
+    assert.equal(regenerateCardBodySchema.safeParse({
+        question: "Question",
+        answer: "Answer",
+        goal: "invent-facts",
+    }).success, false);
+
+    const generationPrompt = buildGenerationSystemPrompt({
+        cardCount: 15,
+        difficulty: "advanced",
+        focus: "application",
+    });
+    assert.match(generationPrompt, /exactly 15/);
+    assert.match(generationPrompt, /tradeoffs/);
+    assert.match(generationPrompt, /scenarios/);
+    assert.match(buildRewriteSystemPrompt("concise"), /unnecessary wording/);
+    assert.match(buildRewriteSystemPrompt("concise"), /do not invent/);
 });
 
 test("PDF signature detection rejects renamed non-PDF files", () => {
@@ -308,6 +355,81 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     assert.equal(unknownCardUpdate.status, 400);
     await unknownCardUpdate.json();
 
+    const unauthenticatedRewrite = await fetch(
+        `${baseUrl}/api/decks/${savedDeck.id}/cards/regenerate`,
+        {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                cardId: updatedDeck.cards[0]?.id,
+                question: "Question?",
+                answer: "Answer.",
+                goal: "clearer",
+            }),
+        },
+    );
+    assert.equal(unauthenticatedRewrite.status, 401);
+    await unauthenticatedRewrite.json();
+
+    const invalidRewrite = await fetch(`${baseUrl}/api/decks/${savedDeck.id}/cards/regenerate`, {
+        method: "POST",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({ question: "", answer: "Answer.", goal: "clearer" }),
+    });
+    assert.equal(invalidRewrite.status, 400);
+    await invalidRewrite.json();
+
+    const forbiddenRewrite = await fetch(`${baseUrl}/api/decks/${savedDeck.id}/cards/regenerate`, {
+        method: "POST",
+        headers: {
+            authorization: `Bearer ${otherUserToken}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            cardId: updatedDeck.cards[0]?.id,
+            question: "Question?",
+            answer: "Answer.",
+            goal: "clearer",
+        }),
+    });
+    assert.equal(forbiddenRewrite.status, 404);
+    await forbiddenRewrite.json();
+
+    const unknownCardRewrite = await fetch(`${baseUrl}/api/decks/${savedDeck.id}/cards/regenerate`, {
+        method: "POST",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            cardId: 999_999,
+            question: "Question?",
+            answer: "Answer.",
+            goal: "clearer",
+        }),
+    });
+    assert.equal(unknownCardRewrite.status, 404);
+    await unknownCardRewrite.json();
+
+    const unconfiguredRewrite = await fetch(`${baseUrl}/api/decks/${savedDeck.id}/cards/regenerate`, {
+        method: "POST",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            cardId: updatedDeck.cards[0]?.id,
+            question: "Question?",
+            answer: "Answer.",
+            goal: "concise",
+        }),
+    });
+    assert.equal(unconfiguredRewrite.status, 503);
+    await unconfiguredRewrite.json();
+
     const forbiddenDeleteResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
         method: "DELETE",
         headers: { authorization: `Bearer ${otherUserToken}` },
@@ -354,6 +476,21 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
         (await invalidUpload.json() as { error: string }).error,
         "Only PDF files are supported",
     );
+
+    const invalidPreferencesForm = new FormData();
+    invalidPreferencesForm.append(
+        "file",
+        new Blob(["%PDF-1.7\n"], { type: "application/pdf" }),
+        "notes.pdf",
+    );
+    invalidPreferencesForm.append("cardCount", "100");
+    const invalidPreferencesUpload = await fetch(`${baseUrl}/api/flashcards/generate`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${registration.token}` },
+        body: invalidPreferencesForm,
+    });
+    assert.equal(invalidPreferencesUpload.status, 400);
+    await invalidPreferencesUpload.json();
 
     const malformedPdfForm = new FormData();
     malformedPdfForm.append(

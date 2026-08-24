@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import type { DeckDetail, UpdateDeckInput } from "../api/deckApi";
+import type {
+    CardRewriteGoal,
+    CardSuggestion,
+    DeckDetail,
+    RegenerateCardInput,
+    UpdateDeckInput,
+} from "../api/deckApi";
 
 const MAX_CARDS = 100;
 
@@ -8,6 +14,7 @@ type DraftCard = {
     id?: number;
     question: string;
     answer: string;
+    rewriteGoal: CardRewriteGoal;
 };
 
 interface DeckEditorProps {
@@ -15,6 +22,7 @@ interface DeckEditorProps {
     saving: boolean;
     error: string | null;
     onSave: (changes: UpdateDeckInput) => void;
+    onRegenerate: (card: RegenerateCardInput) => Promise<CardSuggestion>;
     onClose: () => void;
 }
 
@@ -24,13 +32,16 @@ function originalCards(deck: DeckDetail): DraftCard[] {
         id: card.id,
         question: card.question,
         answer: card.answer,
+        rewriteGoal: "clearer",
     }));
 }
 
-function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
+function DeckEditor({ deck, saving, error, onSave, onRegenerate, onClose }: DeckEditorProps) {
     const [title, setTitle] = useState(deck.title);
     const [cards, setCards] = useState<DraftCard[]>(() => originalCards(deck));
     const [localError, setLocalError] = useState<string | null>(null);
+    const [regeneratingKey, setRegeneratingKey] = useState<string | null>(null);
+    const [regenerationNotice, setRegenerationNotice] = useState<string | null>(null);
     const nextCardKey = useRef(1);
     const dialogRef = useRef<HTMLDivElement>(null);
     const titleRef = useRef<HTMLInputElement>(null);
@@ -43,12 +54,13 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
         cards: cards.map(({ id, question, answer }) => ({ id, question, answer })),
     });
     const dirty = currentDraft !== initialDraft;
+    const busy = saving || regeneratingKey !== null;
 
     const requestClose = useCallback(() => {
-        if (saving) return;
+        if (busy) return;
         if (dirty && !window.confirm("Discard your unsaved deck changes?")) return;
         onClose();
-    }, [dirty, onClose, saving]);
+    }, [busy, dirty, onClose]);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement instanceof HTMLElement
@@ -75,7 +87,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
 
             if (event.key !== "Tab" || !dialogRef.current) return;
             const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
-                'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
             )];
             const first = focusable[0];
             const last = focusable.at(-1);
@@ -122,11 +134,52 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
     const addCard = () => {
         if (cards.length >= MAX_CARDS) return;
         const key = `new-${nextCardKey.current++}`;
-        setCards((current) => [...current, { key, question: "", answer: "" }]);
+        setCards((current) => [...current, {
+            key,
+            question: "",
+            answer: "",
+            rewriteGoal: "clearer",
+        }]);
         setLocalError(null);
         window.setTimeout(() => {
             document.getElementById(`question-${key}`)?.focus();
         }, 0);
+    };
+
+    const updateRewriteGoal = (key: string, rewriteGoal: CardRewriteGoal) => {
+        setCards((current) => current.map((card) => (
+            card.key === key ? { ...card, rewriteGoal } : card
+        )));
+    };
+
+    const handleRegenerate = async (card: DraftCard, index: number) => {
+        const question = card.question.trim();
+        const answer = card.answer.trim();
+        if (!question || !answer) {
+            setLocalError(`Complete both sides of card ${index + 1} before using AI rewrite.`);
+            document.getElementById(`${question ? "answer" : "question"}-${card.key}`)?.focus();
+            return;
+        }
+
+        setRegeneratingKey(card.key);
+        setLocalError(null);
+        setRegenerationNotice(null);
+        try {
+            const suggestion = await onRegenerate({
+                cardId: card.id,
+                question,
+                answer,
+                goal: card.rewriteGoal,
+            });
+            setCards((current) => current.map((draftCard) => (
+                draftCard.key === card.key ? { ...draftCard, ...suggestion } : draftCard
+            )));
+            setRegenerationNotice(`Card ${index + 1} has a new AI draft. Save changes to keep it.`);
+        } catch (err: unknown) {
+            setLocalError(err instanceof Error ? err.message : "This card could not be rewritten.");
+        } finally {
+            setRegeneratingKey(null);
+        }
     };
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -183,7 +236,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                         type="button"
                         className="deck-editor__close"
                         onClick={requestClose}
-                        disabled={saving}
+                        disabled={busy}
                         aria-label="Close deck editor"
                     >
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
@@ -225,7 +278,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                                         <button
                                             type="button"
                                             onClick={() => moveCard(index, -1)}
-                                            disabled={saving || index === 0}
+                                            disabled={busy || index === 0}
                                             aria-label={`Move card ${index + 1} up`}
                                             title="Move up"
                                         >
@@ -234,7 +287,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                                         <button
                                             type="button"
                                             onClick={() => moveCard(index, 1)}
-                                            disabled={saving || index === cards.length - 1}
+                                            disabled={busy || index === cards.length - 1}
                                             aria-label={`Move card ${index + 1} down`}
                                             title="Move down"
                                         >
@@ -253,7 +306,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                                             maxLength={500}
                                             rows={3}
                                             required
-                                            disabled={saving}
+                                            disabled={saving || regeneratingKey === card.key}
                                             placeholder="What should you be able to recall?"
                                         />
                                     </label>
@@ -266,17 +319,50 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                                             maxLength={4000}
                                             rows={4}
                                             required
-                                            disabled={saving}
+                                            disabled={saving || regeneratingKey === card.key}
                                             placeholder="Write the clearest useful answer."
                                         />
                                     </label>
+
+                                    <div className="editor-card__ai">
+                                        <span className="editor-card__ai-label">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z" /><path d="m18 16 .8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z" /></svg>
+                                            <span><strong>AI rewrite</strong>Uses only this card’s current facts.</span>
+                                        </span>
+                                        <label className="editor-card__ai-goal">
+                                            <span>Rewrite style</span>
+                                            <select
+                                                value={card.rewriteGoal}
+                                                onChange={(event) => updateRewriteGoal(
+                                                    card.key,
+                                                    event.target.value as CardRewriteGoal,
+                                                )}
+                                                disabled={busy}
+                                                aria-label={`Rewrite style for card ${index + 1}`}
+                                            >
+                                                <option value="clearer">Improve clarity</option>
+                                                <option value="simpler">Simpler language</option>
+                                                <option value="challenging">More challenging</option>
+                                                <option value="concise">More concise</option>
+                                            </select>
+                                        </label>
+                                        <button
+                                            type="button"
+                                            className="editor-card__rewrite"
+                                            onClick={() => void handleRegenerate(card, index)}
+                                            disabled={busy || !card.question.trim() || !card.answer.trim()}
+                                        >
+                                            {regeneratingKey === card.key && <span className="button-spinner" aria-hidden="true" />}
+                                            {regeneratingKey === card.key ? "Rewriting…" : "Rewrite card"}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <button
                                     type="button"
                                     className="editor-card__remove"
                                     onClick={() => removeCard(card.key)}
-                                    disabled={saving || cards.length === 1}
+                                    disabled={busy || cards.length === 1}
                                     aria-label={`Delete card ${index + 1}`}
                                     title={cards.length === 1 ? "A deck needs at least one card" : "Delete card"}
                                 >
@@ -290,7 +376,7 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                         type="button"
                         className="deck-editor__add"
                         onClick={addCard}
-                        disabled={saving || cards.length >= MAX_CARDS}
+                        disabled={busy || cards.length >= MAX_CARDS}
                     >
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                         Add a card
@@ -303,13 +389,20 @@ function DeckEditor({ deck, saving, error, onSave, onClose }: DeckEditorProps) {
                         </div>
                     )}
 
+                    {regenerationNotice && !localError && !error && (
+                        <div className="deck-editor__notice" role="status">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                            <span>{regenerationNotice}</span>
+                        </div>
+                    )}
+
                     <div className="deck-editor__actions">
                         <span>{dirty ? "Unsaved changes" : "No changes yet"}</span>
                         <div>
-                            <button type="button" className="button button--secondary" onClick={requestClose} disabled={saving}>
+                            <button type="button" className="button button--secondary" onClick={requestClose} disabled={busy}>
                                 Cancel
                             </button>
-                            <button type="submit" className="button button--primary" disabled={saving || !dirty}>
+                            <button type="submit" className="button button--primary" disabled={busy || !dirty}>
                                 {saving && <span className="button-spinner" aria-hidden="true" />}
                                 {saving ? "Saving…" : "Save changes"}
                             </button>

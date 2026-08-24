@@ -77,6 +77,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -89,6 +90,7 @@ a {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 2px;
@@ -1119,6 +1121,100 @@ textarea:focus-visible {
   text-align: center;
 }
 
+.study-recipe {
+  min-width: 0;
+  margin: 18px 0 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: 14px;
+  padding: 10px 14px 15px;
+  background: color-mix(in srgb, var(--accent-soft) 25%, var(--surface));
+}
+
+.study-recipe:disabled {
+  opacity: 0.6;
+}
+
+.study-recipe legend {
+  max-width: calc(100% - 12px);
+  padding: 0 8px;
+}
+
+.study-recipe legend > span:last-child {
+  display: inline-flex;
+  min-width: 0;
+  flex-direction: column;
+  vertical-align: middle;
+  color: var(--ink-soft);
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+
+.study-recipe legend strong {
+  color: var(--ink);
+  font-size: 0.73rem;
+}
+
+.study-recipe__mark {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  margin-right: 8px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  vertical-align: middle;
+}
+
+.study-recipe__mark svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.study-recipe__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.study-recipe__fields label {
+  min-width: 0;
+}
+
+.study-recipe__fields label > span {
+  display: block;
+  margin: 0 0 5px 2px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 0.57rem;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.study-recipe__fields select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 10px;
+  color: var(--ink);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.study-recipe__fields select:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+}
+
 .generation-status,
 .error-message {
   display: flex;
@@ -1889,6 +1985,7 @@ textarea:focus-visible {
 .deck-editor__close svg,
 .deck-editor__add svg,
 .deck-editor__error svg,
+.deck-editor__notice svg,
 .editor-card button svg {
   width: 18px;
   height: 18px;
@@ -2087,6 +2184,93 @@ textarea:focus-visible {
   color: color-mix(in srgb, var(--ink-soft) 72%, transparent);
 }
 
+.editor-card__ai {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, auto) auto;
+  align-items: end;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: color-mix(in srgb, var(--accent-soft) 28%, var(--surface-muted));
+}
+
+.editor-card__ai-label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-soft);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.editor-card__ai-label > svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.editor-card__ai-label strong {
+  display: block;
+  color: var(--ink);
+  font-size: 0.7rem;
+}
+
+.editor-card__ai-goal > span {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.editor-card__ai-goal select {
+  min-width: 150px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0 9px;
+  color: var(--ink);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.67rem;
+  font-weight: 700;
+}
+
+.editor-card__rewrite {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0 12px;
+  color: #ffffff;
+  background: #5d50ca;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.editor-card__rewrite:hover:not(:disabled) {
+  background: #5144b9;
+}
+
+.editor-card__rewrite .button-spinner {
+  width: 14px;
+  height: 14px;
+}
+
 .editor-card__remove {
   align-self: start;
   margin: 18px 10px 0 0;
@@ -2124,20 +2308,30 @@ textarea:focus-visible {
   opacity: 0.5;
 }
 
-.deck-editor__error {
+.deck-editor__error,
+.deck-editor__notice {
   display: flex;
   align-items: center;
   gap: 9px;
   margin-top: 16px;
   border-radius: 10px;
   padding: 11px 13px;
-  color: var(--danger);
-  background: var(--danger-soft);
   font-size: 0.73rem;
   font-weight: 700;
 }
 
-.deck-editor__error svg {
+.deck-editor__error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.deck-editor__notice {
+  color: var(--mint-ink);
+  background: color-mix(in srgb, var(--mint) 55%, var(--surface));
+}
+
+.deck-editor__error svg,
+.deck-editor__notice svg {
   flex: 0 0 auto;
 }
 
@@ -2352,6 +2546,14 @@ textarea:focus-visible {
     padding: 16px 12px;
   }
 
+  .editor-card__ai {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .editor-card__ai-label {
+    grid-column: 1 / -1;
+  }
+
   .editor-card__remove {
     margin-top: 16px;
     margin-right: 7px;
@@ -2411,6 +2613,19 @@ textarea:focus-visible {
   .drop-zone {
     min-height: 210px;
     padding: 24px 18px;
+  }
+
+  .study-recipe__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-card__ai {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-card__ai-goal select,
+  .editor-card__rewrite {
+    width: 100%;
   }
 
   .demo-access {

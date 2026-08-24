@@ -1,12 +1,18 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import type { GenerationPreferences } from "../api/flashcardApi";
 
 interface FileUploaderProps {
-    onUpload: (file: File) => void;
+    onUpload: (file: File, preferences: GenerationPreferences) => void;
     onLoadSample: () => void;
     loading: boolean;
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const DEFAULT_PREFERENCES: GenerationPreferences = {
+    cardCount: 12,
+    difficulty: "standard",
+    focus: "balanced",
+};
 
 function formatFileSize(bytes: number) {
     return bytes < 1024 * 1024
@@ -18,6 +24,7 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
     const [file, setFile] = useState<File | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [validationError, setValidationError] = useState("");
+    const [preferences, setPreferences] = useState<GenerationPreferences>(DEFAULT_PREFERENCES);
     const inputRef = useRef<HTMLInputElement>(null);
     const dragDepth = useRef(0);
 
@@ -77,7 +84,7 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
     };
 
     const handleSubmit = () => {
-        if (file) onUpload(file);
+        if (file) onUpload(file, preferences);
     };
 
     return (
@@ -114,6 +121,63 @@ function FileUploader({ onUpload, onLoadSample, loading }: FileUploaderProps) {
             </div>
 
             {validationError && <p className="validation-error" id="upload-error" role="alert">{validationError}</p>}
+
+            <fieldset className="study-recipe" disabled={loading}>
+                <legend>
+                    <span className="study-recipe__mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z" /><path d="m18 16 .8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z" /></svg>
+                    </span>
+                    <span><strong>Study recipe</strong>Shape the deck before AI builds it.</span>
+                </legend>
+
+                <div className="study-recipe__fields">
+                    <label>
+                        <span>Deck length</span>
+                        <select
+                            value={preferences.cardCount}
+                            onChange={(event) => setPreferences((current) => ({
+                                ...current,
+                                cardCount: Number(event.target.value) as GenerationPreferences["cardCount"],
+                            }))}
+                        >
+                            <option value={8}>Quick · 8 cards</option>
+                            <option value={12}>Standard · 12 cards</option>
+                            <option value={15}>Deep · 15 cards</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Challenge</span>
+                        <select
+                            value={preferences.difficulty}
+                            onChange={(event) => setPreferences((current) => ({
+                                ...current,
+                                difficulty: event.target.value as GenerationPreferences["difficulty"],
+                            }))}
+                        >
+                            <option value="foundation">Foundation</option>
+                            <option value="standard">Standard</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>Emphasis</span>
+                        <select
+                            value={preferences.focus}
+                            onChange={(event) => setPreferences((current) => ({
+                                ...current,
+                                focus: event.target.value as GenerationPreferences["focus"],
+                            }))}
+                        >
+                            <option value="balanced">Balanced</option>
+                            <option value="key-ideas">Key ideas</option>
+                            <option value="definitions">Definitions</option>
+                            <option value="application">Application</option>
+                        </select>
+                    </label>
+                </div>
+            </fieldset>
 
             <button type="button" onClick={handleSubmit} disabled={!file || loading} className="button button--primary button--full">
                 {loading ? "Building your deck…" : "Generate flashcards"}

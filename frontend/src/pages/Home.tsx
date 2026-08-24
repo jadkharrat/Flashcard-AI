@@ -10,12 +10,19 @@ import {
     deleteDeck,
     getDeck,
     listDecks,
+    regenerateCard,
     updateDeck,
+    type CardSuggestion,
     type DeckDetail,
     type DeckSummary,
+    type RegenerateCardInput,
     type UpdateDeckInput,
 } from "../api/deckApi";
-import { generateFlashcards, type Flashcard as FlashcardType } from "../api/flashcardApi";
+import {
+    generateFlashcards,
+    type Flashcard as FlashcardType,
+    type GenerationPreferences,
+} from "../api/flashcardApi";
 import ThemeToggle from "../components/ThemeToggle";
 import { ApiError } from "../api/client";
 import { clearSession, getSessionKind, getSessionUser } from "../lib/session";
@@ -122,7 +129,7 @@ function Home() {
         }, 0);
     };
 
-    const handleUpload = async (file: File) => {
+    const handleUpload = async (file: File, preferences: GenerationPreferences) => {
         const controller = new AbortController();
         activeRequest.current?.abort();
         activeRequest.current = controller;
@@ -130,7 +137,7 @@ function Home() {
         setLoading(true);
         setFlippedAll(false);
         try {
-            const savedDeck = await generateFlashcards(file, controller.signal);
+            const savedDeck = await generateFlashcards(file, preferences, controller.signal);
             if (savedDeck.cards.length === 0) {
                 throw new Error("No flashcards were generated. Try a PDF with more readable text.");
             }
@@ -247,6 +254,21 @@ function Home() {
             setEditorError(err instanceof Error ? err.message : "Your deck changes could not be saved.");
         } finally {
             setSavingDeck(false);
+        }
+    };
+
+    const handleRegenerateCard = async (card: RegenerateCardInput): Promise<CardSuggestion> => {
+        if (!activeDeck) {
+            throw new Error("Open a saved deck before using AI rewrite.");
+        }
+
+        try {
+            return await regenerateCard(activeDeck.id, card);
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.status === 401) {
+                handleExpiredSession();
+            }
+            throw err;
         }
     };
 
@@ -427,6 +449,7 @@ function Home() {
                     saving={savingDeck}
                     error={editorError}
                     onSave={handleSaveDeck}
+                    onRegenerate={handleRegenerateCard}
                     onClose={() => {
                         setEditingDeck(false);
                         setEditorError(null);
