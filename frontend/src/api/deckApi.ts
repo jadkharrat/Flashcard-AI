@@ -23,6 +23,17 @@ export type DeckDetail = DeckSummary & {
     cards: SavedFlashcard[];
 };
 
+export type EditableCardInput = {
+    id?: number;
+    question: string;
+    answer: string;
+};
+
+export type UpdateDeckInput = {
+    title: string;
+    cards: EditableCardInput[];
+};
+
 function authorizationHeaders() {
     const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -104,6 +115,23 @@ export async function getDeck(deckId: number, signal?: AbortSignal): Promise<Dec
 
     if (!isRecordResponse(data)) {
         throw new Error("The service returned an invalid saved deck. Please try again.");
+    }
+
+    return parseDeckDetail(data.deck);
+}
+
+export async function updateDeck(deckId: number, changes: UpdateDeckInput): Promise<DeckDetail> {
+    const data = await requestJson<unknown>(`/api/decks/${deckId}`, {
+        method: "PATCH",
+        headers: {
+            ...authorizationHeaders(),
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(changes),
+    });
+
+    if (!isRecordResponse(data)) {
+        throw new Error("The service returned an invalid updated deck. Please try again.");
     }
 
     return parseDeckDetail(data.deck);

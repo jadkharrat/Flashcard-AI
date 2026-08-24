@@ -178,6 +178,7 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
         flashcards: [
             { question: "First question?", answer: "First answer." },
             { question: "Second question?", answer: "Second answer." },
+            { question: "Third question?", answer: "Third answer." },
         ],
     });
 
@@ -190,7 +191,7 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     };
     assert.equal(deckList.decks.length, 1);
     assert.equal(deckList.decks[0]?.id, savedDeck.id);
-    assert.equal(deckList.decks[0]?.cardCount, 2);
+    assert.equal(deckList.decks[0]?.cardCount, 3);
     assert.equal(deckList.decks[0]?.title, "Integration Study Guide");
 
     const deckDetailResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
@@ -202,8 +203,19 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     };
     assert.deepEqual(
         deckDetail.deck.cards.map((card) => [card.position, card.question]),
-        [[0, "First question?"], [1, "Second question?"]],
+        [[0, "First question?"], [1, "Second question?"], [2, "Third question?"]],
     );
+
+    const unauthenticatedDeckUpdate = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+            title: "Should not save",
+            cards: [{ question: "Question", answer: "Answer" }],
+        }),
+    });
+    assert.equal(unauthenticatedDeckUpdate.status, 401);
+    await unauthenticatedDeckUpdate.json();
 
     const otherUserToken = generateToken({ id: registration.user.id + 999, username: "other-user" });
     const forbiddenDeckResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
@@ -211,6 +223,90 @@ test("health, auth, protected upload, and error contracts work end to end", asyn
     });
     assert.equal(forbiddenDeckResponse.status, 404);
     await forbiddenDeckResponse.json();
+
+    const forbiddenDeckUpdate = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "PATCH",
+        headers: {
+            authorization: `Bearer ${otherUserToken}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            title: "Should not save",
+            cards: [{ question: "Question", answer: "Answer" }],
+        }),
+    });
+    assert.equal(forbiddenDeckUpdate.status, 404);
+    await forbiddenDeckUpdate.json();
+
+    const invalidDeckUpdate = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "PATCH",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({ title: "No cards", cards: [] }),
+    });
+    assert.equal(invalidDeckUpdate.status, 400);
+    await invalidDeckUpdate.json();
+
+    const updatedDeckResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "PATCH",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            title: "  Edited Integration Guide  ",
+            cards: [
+                {
+                    id: savedDeck.cards[1]?.id,
+                    question: "  Revised second question?  ",
+                    answer: "  Revised second answer.  ",
+                },
+                { question: "A new middle card?", answer: "A new answer." },
+                {
+                    id: savedDeck.cards[0]?.id,
+                    question: "First question?",
+                    answer: "First answer.",
+                },
+            ],
+        }),
+    });
+    assert.equal(updatedDeckResponse.status, 200);
+    const updatedDeck = (await updatedDeckResponse.json() as {
+        deck: {
+            title: string;
+            cardCount: number;
+            cards: Array<{ id: number; question: string; answer: string; position: number }>;
+        };
+    }).deck;
+    assert.equal(updatedDeck.title, "Edited Integration Guide");
+    assert.equal(updatedDeck.cardCount, 3);
+    assert.deepEqual(
+        updatedDeck.cards.map((card) => [card.position, card.question, card.answer]),
+        [
+            [0, "Revised second question?", "Revised second answer."],
+            [1, "A new middle card?", "A new answer."],
+            [2, "First question?", "First answer."],
+        ],
+    );
+    assert.equal(updatedDeck.cards[0]?.id, savedDeck.cards[1]?.id);
+    assert.equal(updatedDeck.cards[2]?.id, savedDeck.cards[0]?.id);
+    assert.equal(updatedDeck.cards.some((card) => card.id === savedDeck.cards[2]?.id), false);
+
+    const unknownCardUpdate = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
+        method: "PATCH",
+        headers: {
+            authorization: `Bearer ${registration.token}`,
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            title: updatedDeck.title,
+            cards: [{ id: 999_999, question: "Unknown?", answer: "Unknown." }],
+        }),
+    });
+    assert.equal(unknownCardUpdate.status, 400);
+    await unknownCardUpdate.json();
 
     const forbiddenDeleteResponse = await fetch(`${baseUrl}/api/decks/${savedDeck.id}`, {
         method: "DELETE",

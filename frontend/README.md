@@ -1,6 +1,6 @@
 # RecallAI frontend
 
-The RecallAI web client is a React and TypeScript application built with Vite. It provides account creation and sign-in, a no-account sample workspace, PDF upload validation, a private saved-deck library, AI-generated flashcard decks, accessible card controls, and responsive light/dark themes.
+The RecallAI web client is a React and TypeScript application built with Vite. It provides account creation and sign-in, a no-account sample workspace, PDF upload validation, a private saved-deck library, a focused deck-and-card editor, AI-generated flashcard decks, accessible card controls, and responsive light/dark themes.
 
 ## Local setup
 

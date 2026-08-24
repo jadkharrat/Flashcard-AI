@@ -4,8 +4,17 @@ import FileUploader from "../components/FileUploader";
 import Loader from "../components/Loader";
 import Flashcard from "../components/Flashcard";
 import DeckLibrary from "../components/DeckLibrary";
+import DeckEditor from "../components/DeckEditor";
 import Brand from "../components/Brand";
-import { deleteDeck, getDeck, listDecks, type DeckSummary } from "../api/deckApi";
+import {
+    deleteDeck,
+    getDeck,
+    listDecks,
+    updateDeck,
+    type DeckDetail,
+    type DeckSummary,
+    type UpdateDeckInput,
+} from "../api/deckApi";
 import { generateFlashcards, type Flashcard as FlashcardType } from "../api/flashcardApi";
 import ThemeToggle from "../components/ThemeToggle";
 import { ApiError } from "../api/client";
@@ -47,12 +56,15 @@ function Home() {
     const [error, setError] = useState<string | null>(null);
     const [flippedAll, setFlippedAll] = useState<boolean>(false);
     const [deckTitle, setDeckTitle] = useState<string>(() => isDemo ? "Learning science & AI" : "");
-    const [activeDeckId, setActiveDeckId] = useState<number | null>(null);
+    const [activeDeck, setActiveDeck] = useState<DeckDetail | null>(null);
     const [savedDecks, setSavedDecks] = useState<DeckSummary[]>([]);
     const [libraryLoading, setLibraryLoading] = useState<boolean>(false);
     const [libraryError, setLibraryError] = useState<string | null>(null);
     const [openingDeckId, setOpeningDeckId] = useState<number | null>(null);
     const [deletingDeckId, setDeletingDeckId] = useState<number | null>(null);
+    const [editingDeck, setEditingDeck] = useState<boolean>(false);
+    const [savingDeck, setSavingDeck] = useState<boolean>(false);
+    const [editorError, setEditorError] = useState<string | null>(null);
     const deckRef = useRef<HTMLElement>(null);
     const activeRequest = useRef<AbortController | null>(null);
     const libraryRequest = useRef<AbortController | null>(null);
@@ -124,7 +136,7 @@ function Home() {
             }
             setFlashcards(savedDeck.cards);
             setDeckTitle(savedDeck.title);
-            setActiveDeckId(savedDeck.id);
+            setActiveDeck(savedDeck);
             setSavedDecks((current) => [savedDeck, ...current.filter((deck) => deck.id !== savedDeck.id)]);
             scrollToDeck();
         } catch (err: unknown) {
@@ -150,7 +162,7 @@ function Home() {
         setError(null);
         setFlippedAll(false);
         setDeckTitle("Learning science & AI");
-        setActiveDeckId(null);
+        setActiveDeck(null);
         setFlashcards(SAMPLE_DECK);
         scrollToDeck();
     };
@@ -166,7 +178,7 @@ function Home() {
             const savedDeck = await getDeck(deckId, controller.signal);
             setFlashcards(savedDeck.cards);
             setDeckTitle(savedDeck.title);
-            setActiveDeckId(savedDeck.id);
+            setActiveDeck(savedDeck);
             setFlippedAll(false);
             scrollToDeck();
         } catch (err: unknown) {
@@ -193,11 +205,12 @@ function Home() {
         try {
             await deleteDeck(deck.id);
             setSavedDecks((current) => current.filter((savedDeck) => savedDeck.id !== deck.id));
-            if (activeDeckId === deck.id) {
-                setActiveDeckId(null);
+            if (activeDeck?.id === deck.id) {
+                setActiveDeck(null);
                 setFlashcards([]);
                 setDeckTitle("");
                 setFlippedAll(false);
+                setEditingDeck(false);
             }
         } catch (err: unknown) {
             if (err instanceof ApiError && err.status === 401) {
@@ -207,6 +220,33 @@ function Home() {
             setLibraryError(err instanceof Error ? err.message : "That deck could not be deleted.");
         } finally {
             setDeletingDeckId(null);
+        }
+    };
+
+    const handleSaveDeck = async (changes: UpdateDeckInput) => {
+        if (!activeDeck) return;
+
+        setSavingDeck(true);
+        setEditorError(null);
+        try {
+            const updatedDeck = await updateDeck(activeDeck.id, changes);
+            setActiveDeck(updatedDeck);
+            setFlashcards(updatedDeck.cards);
+            setDeckTitle(updatedDeck.title);
+            setFlippedAll(false);
+            setSavedDecks((current) => [
+                updatedDeck,
+                ...current.filter((deck) => deck.id !== updatedDeck.id),
+            ]);
+            setEditingDeck(false);
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.status === 401) {
+                handleExpiredSession();
+                return;
+            }
+            setEditorError(err instanceof Error ? err.message : "Your deck changes could not be saved.");
+        } finally {
+            setSavingDeck(false);
         }
     };
 
@@ -347,14 +387,29 @@ function Home() {
                                 <h2 id="deck-heading">{deckTitle}</h2>
                                 <p>{flashcards.length} cards · Select any card to reveal its answer</p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setFlippedAll(!flippedAll)}
-                                className="button button--secondary deck-toolbar__button"
-                            >
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.3-6M20 12a8 8 0 0 1-13.3 6" /><path d="M17 2v4h-4M7 22v-4h4" /></svg>
-                                {flippedAll ? "Show all questions" : "Reveal all answers"}
-                            </button>
+                            <div className="deck-toolbar__actions">
+                                {activeDeck && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setEditorError(null);
+                                            setEditingDeck(true);
+                                        }}
+                                        className="button button--secondary deck-toolbar__button"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16-.5 4.5L8 20l10.5-10.5-4-4zM12.5 7.5l4 4" /></svg>
+                                        Edit deck
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setFlippedAll(!flippedAll)}
+                                    className="button button--secondary deck-toolbar__button"
+                                >
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.3-6M20 12a8 8 0 0 1-13.3 6" /><path d="M17 2v4h-4M7 22v-4h4" /></svg>
+                                    {flippedAll ? "Show all questions" : "Reveal all answers"}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flashcard-grid">
@@ -365,6 +420,19 @@ function Home() {
                     </section>
                 )}
             </main>
+
+            {editingDeck && activeDeck && (
+                <DeckEditor
+                    deck={activeDeck}
+                    saving={savingDeck}
+                    error={editorError}
+                    onSave={handleSaveDeck}
+                    onClose={() => {
+                        setEditingDeck(false);
+                        setEditorError(null);
+                    }}
+                />
+            )}
         </div>
     );
 }

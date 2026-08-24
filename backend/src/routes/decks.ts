@@ -2,8 +2,16 @@ import { Router } from "express";
 import prisma from "../database/connection.js";
 import { AppError } from "../errors/AppError.js";
 import { requireAuthentication } from "../middleware/authenticate.js";
-import { serializeDeckDetail, serializeDeckSummary } from "../services/deckService.js";
+import {
+    serializeDeckDetail,
+    serializeDeckSummary,
+    updateOwnedDeck,
+} from "../services/deckService.js";
 import type { AuthenticationToken } from "../utils/token.js";
+import {
+    firstDeckValidationError,
+    updateDeckBodySchema,
+} from "../validation/decks.js";
 
 const router = Router();
 
@@ -50,6 +58,30 @@ router.get("/:deckId", async (req, res, next) => {
                 userId: authenticatedUserId(res.locals),
             },
             include: { cards: { orderBy: { position: "asc" } } },
+        });
+
+        if (!deck) {
+            throw new AppError(404, "Deck not found", "DECK_NOT_FOUND");
+        }
+
+        res.json({ deck: serializeDeckDetail(deck) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.patch("/:deckId", async (req, res, next) => {
+    try {
+        const body = updateDeckBodySchema.safeParse(req.body);
+        if (!body.success) {
+            res.status(400).json({ error: firstDeckValidationError(body.error) });
+            return;
+        }
+
+        const deck = await updateOwnedDeck({
+            deckId: parseDeckId(req.params.deckId),
+            userId: authenticatedUserId(res.locals),
+            changes: body.data,
         });
 
         if (!deck) {

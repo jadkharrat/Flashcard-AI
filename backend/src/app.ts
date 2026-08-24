@@ -52,10 +52,10 @@ export function createApp(): express.Express {
             callback(new AppError(403, "Origin is not allowed", "CORS_ORIGIN_DENIED"));
         },
         allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
-        methods: ["GET", "POST", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         maxAge: 86_400,
     }));
-    app.use(express.json({ limit: "32kb", strict: true }));
+    app.use(express.json({ limit: "1mb", strict: true }));
 
     app.get("/", (_req, res) => {
         res.json({ name: "RecallAI API", health: "/api/health" });
